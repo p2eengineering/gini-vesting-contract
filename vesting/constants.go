@@ -1,6 +1,6 @@
 package vesting
 
-type TokenAllocation int
+type VestingType int
 
 const (
 	kalpFoundation = "0b87970433b22494faff1cc7a819e71bddc7880c"
@@ -12,7 +12,7 @@ const (
 	claimInterval                  = 30
 	giniTokenEvent                 = "SetGiniToken"
 
-	Team TokenAllocation = iota
+	Team VestingType = iota
 	Foundation
 	AngelRound
 	SeedRound
@@ -28,7 +28,7 @@ const (
 	PublicAllocation
 )
 
-func (t TokenAllocation) String() string {
+func (v VestingType) String() string {
 	return [...]string{
 		"Team",
 		"Foundation",
@@ -44,5 +44,5 @@ func (t TokenAllocation) String() string {
 		"Airdrop",
 		"LiquidityPool",
 		"PublicAllocation",
-	}[t]
+	}[v]
 }
