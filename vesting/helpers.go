@@ -6,25 +6,21 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"regexp"
 	"strings"
 
 	"github.com/p2eengineering/kalp-sdk-public/kalpsdk"
 )
 
-var (
-	beneficiaries = make(map[string]map[string]*Beneficiary)
-	userVestings  = make(map[string][]string)
-)
-
 func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, beneficiary, amount string) error {
 	// Ensure beneficiary is not zero address
-	if beneficiary == "" {
+	if IsUserAddressValid(beneficiary) {
 		return errors.New("beneficiary address cannot be zero")
 	}
 
 	amountInInt, ok := new(big.Int).SetString(amount, 10)
 	if !ok {
-		return fmt.Errorf("invalid amount format for beneficiary %s", beneficiary)
+		return InvalidAmountError("beneficiary", beneficiary)
 	}
 
 	// Ensure amount is not zero
@@ -32,20 +28,17 @@ func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 		return fmt.Errorf("%w: %s", ErrZeroVestingAmount, beneficiary)
 	}
 
-	beneficiaryJSON, err := ctx.GetState(fmt.Sprintf("beneficiary_%s_%s", vestingID, beneficiary))
+	beneficiaryJSON, err := ctx.GetState(fmt.Sprintf("beneficiaries_%s_%s", vestingID, beneficiary))
 	if err != nil {
-		return fmt.Errorf("failed to get user vestings for %s: %v", beneficiary, err)
+		return fmt.Errorf("failed to get Beneficiary struct for vestingId : %s and beneficiary: %s, %v", vestingID, beneficiary, err)
 	}
 
 	var beneficiaryStruct *Beneficiary
-	// Debug existing state
-	fmt.Printf("Existing state: %s\n", string(beneficiaryJSON))
 
-	// Unmarshal existing data
 	if beneficiaryJSON == nil {
 		beneficiaryJSON, err = json.Marshal(&Beneficiary{
 			TotalAllocations: amount,
-			ClaimedAmount:    "0", // Initialize with zero
+			ClaimedAmount:    "0",
 		})
 		if err != nil {
 			return fmt.Errorf("failed to marshal beneficiaries: %s", err.Error())
@@ -53,15 +46,13 @@ func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 	} else {
 		err = json.Unmarshal(beneficiaryJSON, &beneficiaryStruct)
 		if err != nil {
-			return fmt.Errorf("failed to unmarshal user vesting list for %s: %v", beneficiary, err)
+			return fmt.Errorf("failed to unmarshal beneficiary for %s: %v", beneficiary, err)
 		}
-
-		fmt.Printf("Existing beneficiaryStruct state: %s\n", beneficiaryStruct, *beneficiaryStruct)
 
 		if beneficiaryStruct != nil {
 			totalAllocationsInInt, ok := new(big.Int).SetString(beneficiaryStruct.TotalAllocations, 10)
 			if !ok {
-				return fmt.Errorf("invalid amount format for beneficiary %s", beneficiary)
+				return InvalidAmountError("beneficiary", beneficiary)
 			}
 
 			if totalAllocationsInInt.Cmp(big.NewInt(0)) != 0 {
@@ -70,60 +61,26 @@ func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 		}
 	}
 
-	err = ctx.PutStateWithoutKYC(fmt.Sprintf("beneficiary_%s_%s", vestingID, beneficiary), beneficiaryJSON)
+	err = ctx.PutStateWithoutKYC(fmt.Sprintf("beneficiaries_%s_%s", vestingID, beneficiary), beneficiaryJSON)
 	if err != nil {
 		return fmt.Errorf("failed to set vestingPeriod: %v", err)
 	}
 
-	fmt.Println("hello userveting----------->", fmt.Sprintf("uservesting_%s", beneficiary))
-
-	userVestingJSON, err := ctx.GetState(fmt.Sprintf("uservesting_%s", beneficiary))
+	userVestingList, err := GetUserVesting(ctx, fmt.Sprintf("uservesting_%s", beneficiary))
 	if err != nil {
-		return fmt.Errorf("failed to get user vestings for %s: %v", beneficiary, err)
+		return fmt.Errorf("failed to get vesting list: %v", err)
 	}
 
-	fmt.Println("hello userveting json----------->", string(userVestingJSON))
-
-	var userVestingList []string
-	if userVestingJSON == nil {
-		// Initialize if no data exists
-		userVestingList = []string{}
-	} else {
-		// Debug existing state
-		fmt.Printf("Existing state: %s\n", string(userVestingJSON))
-
-		// Unmarshal existing data
-		err = json.Unmarshal(userVestingJSON, &userVestingList)
-		if err != nil {
-			return fmt.Errorf("failed to unmarshal user vesting list for %s: %v", beneficiary, err)
-		}
-	}
-
-	fmt.Printf("Existing array state: %s\n", userVestingList)
-
-	// Append the new vestingID
 	userVestingList = append(userVestingList, vestingID)
 
-	// Marshal the updated list
-	updatedUserVestingJSON, err := json.Marshal(userVestingList)
+	err = SetUserVesting(ctx, fmt.Sprintf("uservesting_%s", beneficiary), userVestingList)
 	if err != nil {
-		return fmt.Errorf("failed to marshal updated user vesting list for %s: %v", beneficiary, err)
+		return fmt.Errorf("failed to update vesting list: %v", err)
 	}
 
-	// Debug the JSON being saved
-	fmt.Printf("Saving data: Key=%s, Value=%s\n", fmt.Sprintf("uservesting_%s", beneficiary), string(updatedUserVestingJSON))
-
-	// Save the updated state
-	err = ctx.PutStateWithoutKYC(fmt.Sprintf("uservesting_%s", beneficiary), updatedUserVestingJSON)
-	if err != nil {
-		return fmt.Errorf("failed to set updated user vesting list for %s: %v", beneficiary, err)
-	}
-
-	fmt.Printf("Beneficiary %s added to vesting %s with allocation %s\n", beneficiary, vestingID, amount)
 	return nil
 }
 
-// Function to get extract the userId from ca identity.  It is required to for checking the minter
 func GetUserId(sdk kalpsdk.TransactionContextInterface) (string, error) {
 	b64ID, err := sdk.GetClientIdentity().GetID()
 	if err != nil {
@@ -138,4 +95,47 @@ func GetUserId(sdk kalpsdk.TransactionContextInterface) (string, error) {
 	completeId := string(decodeID)
 	userId := completeId[(strings.Index(completeId, "x509::CN=") + 9):strings.Index(completeId, ",")]
 	return userId, nil
+}
+
+func IsContractAddressValid(address string) bool {
+	// Example validation logic (you can modify this to fit your use case)
+	if address == "" {
+		return false
+	}
+	// Assuming contract addresses should start with "0x" and have 42 characters
+	isValid, _ := regexp.MatchString(hexAddressRegex, address)
+	return isValid
+}
+
+// IsUserAddressValid validates if the user address is valid
+func IsUserAddressValid(address string) bool {
+	// Example validation logic (you can modify this to fit your use case)
+	if address == "" {
+		return false
+	}
+	// Assuming user addresses have the same structure as contract addresses
+	isValid, _ := regexp.MatchString(hexAddressRegex, address)
+	return isValid
+}
+
+func Decimals() uint64 {
+	return 18 // You can modify this value if GINI uses a different decimal scheme
+}
+
+// ConvertGiniToWei converts a GINI token amount (uint64) to Wei (string)
+func ConvertGiniToWei(giniAmount uint64) string {
+	// Get the number of decimals for GINI (commonly 18)
+	decimals := Decimals()
+
+	// Convert giniAmount to a big.Int
+	giniAmountBigInt := new(big.Int).SetUint64(giniAmount)
+
+	// Calculate 10^decimals as the multiplier
+	multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil)
+
+	// Multiply GINI amount by 10^decimals to convert to Wei
+	weiAmount := new(big.Int).Mul(giniAmountBigInt, multiplier)
+
+	// Convert weiAmount to string and return
+	return weiAmount.String()
 }
