@@ -1,1 +1,0 @@
-Gini Vesting Contract
