@@ -28,23 +28,32 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 		return NewCustomError(http.StatusBadRequest, "only kalp foundation can intialize the contract", err)
 	}
 
-	// Initialize different vesting periods
-	validateNSetVesting(ctx, Team.String(), 0, startTimestamp, 120, ConvertGiniToWei(300000000000), 0)
-	validateNSetVesting(ctx, Foundation.String(), 0, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(2200000000000), 0)
-	validateNSetVesting(ctx, AngelRound.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(200000000000), 0)
-	validateNSetVesting(ctx, SeedRound.String(), 30*10*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(400000000000), 0)
-	validateNSetVesting(ctx, PrivateRound1.String(), 30*12*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(140000000000), 0)
-	validateNSetVesting(ctx, PrivateRound2.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(600000000000), 0)
-	validateNSetVesting(ctx, Advisors.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(300000000000), 0)
-	validateNSetVesting(ctx, KOLRound.String(), 0, startTimestamp, 180, ConvertGiniToWei(300000000000), 25)
-	validateNSetVesting(ctx, Marketing.String(), 0, startTimestamp, 240, ConvertGiniToWei(800000000000), 10)
-	validateNSetVesting(ctx, StakingRewards.String(), 30*3*24*60*60, startTimestamp, 30*24*24*60*60, ConvertGiniToWei(180000000000), 0)
-	validateNSetVesting(ctx, EcosystemReserve.String(), 0, startTimestamp, 30*150*24*60*60, ConvertGiniToWei(560000000000), 2)
-	validateNSetVesting(ctx, Airdrop.String(), 60, startTimestamp, 1400, ConvertGiniToWei(800000000000), 10)
-	validateNSetVesting(ctx, LiquidityPool.String(), 0, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(200000000000), 25)
-	validateNSetVesting(ctx, PublicAllocation.String(), 30*3*24*60*60, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(600000000000), 25)
+	beneficiaryJSON, err := ctx.GetState(kalpFoundationBeneficiaryKey)
+	if err != nil {
+		return fmt.Errorf("failed to get Beneficiary struct for %s, %v", kalpFoundationBeneficiaryKey, err)
+	}
 
-	err = SetBeneficiary(ctx, kalpFoundationBeneficiary, &Beneficiary{
+	if beneficiaryJSON != nil {
+		return fmt.Errorf("Contract is already initialised as %w: %s", ErrBeneficiaryAlreadyExists, kalpFoundationBeneficiaryKey)
+	}
+
+	// Initialize different vesting periods
+	validateNSetVesting(ctx, Team.String(), 30*12*24*60*60, startTimestamp, 30*24*24*60*60, ConvertGiniToWei(300000000), 0)
+	validateNSetVesting(ctx, Foundation.String(), 0, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(220000000), 0)
+	validateNSetVesting(ctx, AngelRound.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(20000000), 0)
+	validateNSetVesting(ctx, SeedRound.String(), 30*10*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(40000000), 0)
+	validateNSetVesting(ctx, PrivateRound1.String(), 30*12*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(140000000), 0)
+	validateNSetVesting(ctx, PrivateRound2.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(60000000), 0)
+	validateNSetVesting(ctx, Advisors.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(30000000), 0)
+	validateNSetVesting(ctx, KOLRound.String(), 30*3*24*60*60, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(30000000), 25)
+	validateNSetVesting(ctx, Marketing.String(), 30*1*24*60*60, startTimestamp, 30*18*24*60*60, ConvertGiniToWei(80000000), 10)
+	validateNSetVesting(ctx, StakingRewards.String(), 30*3*24*60*60, startTimestamp, 30*24*24*60*60, ConvertGiniToWei(180000000), 0)
+	validateNSetVesting(ctx, EcosystemReserve.String(), 0, startTimestamp, 30*150*24*60*60, ConvertGiniToWei(560000000), 2)
+	validateNSetVesting(ctx, Airdrop.String(), 30*6*24*60*60, startTimestamp, 30*9*24*60*60, ConvertGiniToWei(80000000), 10)
+	validateNSetVesting(ctx, LiquidityPool.String(), 0, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(200000000), 25)
+	validateNSetVesting(ctx, PublicAllocation.String(), 30*3*24*60*60, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(60000000), 25)
+
+	err = SetBeneficiary(ctx, kalpFoundationBeneficiaryKey, &Beneficiary{
 		TotalAllocations: kalpFoundationTotalAllocations,
 		ClaimedAmount:    kalpFoundationClaimedAmount,
 	})
@@ -52,8 +61,8 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 		return NewCustomError(http.StatusInternalServerError, "failed to set beneficiaries", err)
 	}
 
-	userVestingList := []string{EcosystemReserve.String()}
-	err = SetUserVesting(ctx, kalpFoundationUserVesting, userVestingList)
+	userVestingList := UserVestings{EcosystemReserve.String()}
+	err = SetUserVesting(ctx, kalpFoundationUserVestingKey, userVestingList)
 	if err != nil {
 		return NewCustomError(http.StatusInternalServerError, "failed to set user vestings", err)
 	}
@@ -61,7 +70,7 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 	return nil
 }
 
-func (s *SmartContract) AddBeneficiaries(ctx kalpsdk.TransactionContextInterface, vestingID VestingType, beneficiaries []string, amounts []string) error {
+func (s *SmartContract) AddBeneficiaries(ctx kalpsdk.TransactionContextInterface, vestingID string, beneficiaries []string, amounts []string) error {
 	signer, err := GetUserId(ctx)
 	if err != nil {
 		return NewCustomError(http.StatusBadRequest, "failed to get client id", err)
@@ -71,7 +80,7 @@ func (s *SmartContract) AddBeneficiaries(ctx kalpsdk.TransactionContextInterface
 		return NewCustomError(http.StatusBadRequest, "only kalp foundation can intialize the contract", err)
 	}
 
-	vesting, err := GetVestingPeriod(ctx, vestingID.String())
+	vesting, err := GetVestingPeriod(ctx, vestingID)
 	if err != nil {
 		return fmt.Errorf("unable to get vesting: %v", err)
 	}
@@ -88,10 +97,10 @@ func (s *SmartContract) AddBeneficiaries(ctx kalpsdk.TransactionContextInterface
 	for i := 0; i < len(beneficiaries); i++ {
 		amount, ok := new(big.Int).SetString(amounts[i], 10)
 		if !ok {
-			return InvalidAmountError("beneficiary", beneficiaries[i])
+			return InvalidAmountError("beneficiary", beneficiaries[i], amounts[i])
 		}
 
-		err := addBeneficiary(ctx, vestingID.String(), beneficiaries[i], amounts[i])
+		err := addBeneficiary(ctx, vestingID, beneficiaries[i], amounts[i])
 		if err != nil {
 			return err
 		}
@@ -101,7 +110,7 @@ func (s *SmartContract) AddBeneficiaries(ctx kalpsdk.TransactionContextInterface
 
 	vestingTotalSupply, ok := new(big.Int).SetString(vesting.TotalSupply, 10)
 	if !ok {
-		return InvalidAmountError("vestingTotalSupply", vestingID.String())
+		return InvalidAmountError("vestingTotalSupply", vestingID, vesting.TotalSupply)
 	}
 
 	if vestingTotalSupply.Cmp(totalAllocations) < 0 {
@@ -110,7 +119,7 @@ func (s *SmartContract) AddBeneficiaries(ctx kalpsdk.TransactionContextInterface
 
 	vestingTotalSupply.Sub(vestingTotalSupply, totalAllocations)
 
-	EmitBeneficiariesAdded(ctx, vestingID.String(), totalAllocations.String())
+	EmitBeneficiariesAdded(ctx, vestingID, totalAllocations.String())
 
 	return nil
 }
@@ -118,11 +127,11 @@ func (s *SmartContract) AddBeneficiaries(ctx kalpsdk.TransactionContextInterface
 func (s *SmartContract) SetGiniToken(ctx kalpsdk.TransactionContextInterface, tokenAddress string) error {
 	_, err := GetUserId(ctx)
 	if err != nil {
-		return fmt.Errorf("error with status code %v, failed to get client id: %v", http.StatusBadRequest, err)
+		return NewCustomError(http.StatusBadRequest, "failed to get client id", err)
 	}
 
-	if tokenAddress == "" || tokenAddress == "0x0000000000000000000000000000000000000000" {
-		return fmt.Errorf("token address cannot be zero")
+	if IsContractAddressValid(tokenAddress) {
+		return ErrInvalidContractAddress
 	}
 
 	giniTokenAddress, err := ctx.GetState("giniToken")
@@ -130,7 +139,7 @@ func (s *SmartContract) SetGiniToken(ctx kalpsdk.TransactionContextInterface, to
 		return fmt.Errorf("failed to get gini token state: %v", err)
 	}
 	if giniTokenAddress != nil && string(giniTokenAddress) != "" {
-		return fmt.Errorf("token already set")
+		return ErrContractAddressAlreadySet
 	}
 
 	err = ctx.PutStateWithoutKYC("giniToken", []byte(tokenAddress))
@@ -313,7 +322,7 @@ func (s *SmartContract) GetClaimsAmountForAllVestings(ctx kalpsdk.TransactionCon
 
 		amountInInt, ok := new(big.Int).SetString(claimAmount, 10)
 		if !ok {
-			return nil, nil, nil, InvalidAmountError("vestingID", vestingID)
+			return nil, nil, nil, InvalidAmountError("vestingID", vestingID, claimAmount)
 		}
 
 		totalAmount.Add(totalAmount, amountInInt)
@@ -387,119 +396,4 @@ func (s *SmartContract) GetTotalClaims(ctx kalpsdk.TransactionContextInterface, 
 	}
 
 	return userVestingList, totalClaims, nil
-}
-
-func (s *SmartContract) Claim(ctx kalpsdk.TransactionContextInterface, vestingID VestingType) error {
-	// Retrieve beneficiary data
-	signer, err := GetUserId(ctx)
-	if err != nil {
-		return NewCustomError(http.StatusBadRequest, "failed to get client id", err)
-	}
-
-	beneficiaryKey := fmt.Sprintf("beneficiary_%s_%s", vestingID, signer)
-	beneficiary, err := GetBeneficiary(ctx, beneficiaryKey)
-	if err != nil {
-		return fmt.Errorf("failed to get beneficiary data for vestingID %s: %v", vestingID, err)
-	}
-
-	// Retrieve vesting period data
-	vestingKey := fmt.Sprintf("vesting_%s", vestingID)
-	vestingBytes, err := ctx.GetState(vestingKey)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve vesting period data: %v", err)
-	}
-	if vestingBytes == nil {
-		return fmt.Errorf("no vesting data found for vesting ID %s", vestingID)
-	}
-
-	var vesting VestingPeriod
-	if err := json.Unmarshal(vestingBytes, &vesting); err != nil {
-		return fmt.Errorf("failed to unmarshal vesting data: %v", err)
-	}
-
-	// Check if beneficiary has already claimed all allocations
-	claimedAmount := big.NewInt(0)
-	claimedAmount.SetString(beneficiary.ClaimedAmount, 10)
-
-	totalAllocations := big.NewInt(0)
-	totalAllocations.SetString(beneficiary.TotalAllocations, 10)
-
-	if claimedAmount.Cmp(totalAllocations) == 0 {
-		return fmt.Errorf("nothing to claim: already claimed all allocations")
-	}
-
-	// Calculate amount to claim
-	amountToClaim, err := s.CalculateClaimAmount(ctx, ctx.GetClientIdentity().GetID(), vestingID)
-	if err != nil {
-		return fmt.Errorf("failed to calculate claim amount: %v", err)
-	}
-	if amountToClaim.Cmp(big.NewInt(0)) == 0 {
-		if vesting.StartTimestamp > uint64(ctx.GetStub().GetTxTimestamp().Seconds) {
-			return fmt.Errorf("vesting has not started yet for vesting ID %s", vestingID)
-		} else {
-			return fmt.Errorf("nothing to claim")
-		}
-	}
-
-	// Update claimed amount for beneficiary
-	claimedAmount.Add(claimedAmount, amountToClaim)
-	beneficiary.ClaimedAmount = claimedAmount.String()
-
-	// Save updated beneficiary data
-	updatedBeneficiaryBytes, err := json.Marshal(beneficiary)
-	if err != nil {
-		return fmt.Errorf("failed to marshal updated beneficiary data: %v", err)
-	}
-	if err := ctx.PutState(beneficiaryKey, updatedBeneficiaryBytes); err != nil {
-		return fmt.Errorf("failed to update beneficiary data: %v", err)
-	}
-
-	// Update total claims for the vesting ID
-	totalClaimsKey := fmt.Sprintf("total_claims_%s", vestingID)
-	totalClaimsBytes, err := ctx.GetState(totalClaimsKey)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve total claims data: %v", err)
-	}
-
-	totalClaims := big.NewInt(0)
-	if totalClaimsBytes != nil {
-		totalClaims.SetString(string(totalClaimsBytes), 10)
-	}
-	totalClaims.Add(totalClaims, amountToClaim)
-
-	if err := ctx.PutState(totalClaimsKey, []byte(totalClaims.String())); err != nil {
-		return fmt.Errorf("failed to update total claims for vesting ID %s: %v", vestingID, err)
-	}
-
-	// Update total claims across all vestings
-	totalClaimsForAllBytes, err := ctx.GetState("total_claims_for_all")
-	if err != nil {
-		return fmt.Errorf("failed to retrieve total claims for all vestings: %v", err)
-	}
-
-	totalClaimsForAll := big.NewInt(0)
-	if totalClaimsForAllBytes != nil {
-		totalClaimsForAll.SetString(string(totalClaimsForAllBytes), 10)
-	}
-	totalClaimsForAll.Add(totalClaimsForAll, amountToClaim)
-
-	if err := ctx.PutState("total_claims_for_all", []byte(totalClaimsForAll.String())); err != nil {
-		return fmt.Errorf("failed to update total claims for all vestings: %v", err)
-	}
-
-	// Emit Claim event (can be implemented as needed in your system)
-
-	// Simulate transfer of tokens (in a real system, you would interact with a token contract or handle appropriately)
-	if err := s.TransferTokens(ctx, ctx.GetClientIdentity().GetID(), amountToClaim); err != nil {
-		return fmt.Errorf("failed to transfer tokens: %v", err)
-	}
-
-	return nil
-}
-
-// TransferTokens is a helper function to simulate token transfer
-func (s *SmartContract) TransferTokens(ctx kalpsdk.TransactionContextInterface, recipient string, amount *big.Int) error {
-	// Simulate the transfer; in a real implementation, interact with the token system
-	fmt.Printf("Transferred %s tokens to %s\n", amount.String(), recipient)
-	return nil
 }

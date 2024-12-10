@@ -6,12 +6,16 @@ import (
 )
 
 var (
-	ErrNoBeneficiaries          = errors.New("no beneficiaries provided")
-	ErrArraysLengthMismatch     = errors.New("beneficiaries and amounts arrays length mismatch")
-	ErrTotalSupplyReached       = errors.New("total supply reached for vesting type")
-	ErrZeroVestingAmount        = errors.New("vesting amount cannot be zero")
-	ErrBeneficiaryAlreadyExists = errors.New("beneficiary already exists")
-	ErrCannotBeZero             = errors.New("startTimestamp cannot be zero")
+	ErrNoBeneficiaries           = errors.New("no beneficiaries provided")
+	ErrArraysLengthMismatch      = errors.New("beneficiaries and amounts arrays length mismatch")
+	ErrTotalSupplyReached        = errors.New("total supply reached for vesting type")
+	ErrZeroVestingAmount         = errors.New("vesting amount cannot be zero")
+	ErrBeneficiaryAlreadyExists  = errors.New("beneficiary already exists")
+	ErrCannotBeZero              = errors.New("startTimestamp cannot be zero")
+	ErrInvalidUserAddress        = errors.New("beneficiary address cannot be zero")
+	ErrInvalidContractAddress    = errors.New("contract address is invalid")
+	ErrContractAddressAlreadySet = errors.New("contract address is already set")
+	ErrNonPositiveVestingAmount  = errors.New("vesting amount cannot be less than or equal to zero")
 )
 
 type CustomError struct {
@@ -20,7 +24,7 @@ type CustomError struct {
 	Err     error
 }
 
-func InvalidAmountError(entity string, value string) error {
+func InvalidAmountError(entity, value, amount string) error {
 	return fmt.Errorf("invalid amount format for %s with value %s", entity, value)
 }
 
