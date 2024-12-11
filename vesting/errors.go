@@ -6,16 +6,18 @@ import (
 )
 
 var (
-	ErrNoBeneficiaries           = errors.New("no beneficiaries provided")
-	ErrArraysLengthMismatch      = errors.New("beneficiaries and amounts arrays length mismatch")
-	ErrTotalSupplyReached        = errors.New("total supply reached for vesting type")
-	ErrZeroVestingAmount         = errors.New("vesting amount cannot be zero")
-	ErrBeneficiaryAlreadyExists  = errors.New("beneficiary already exists")
-	ErrCannotBeZero              = errors.New("startTimestamp cannot be zero")
-	ErrInvalidUserAddress        = errors.New("beneficiary address cannot be zero")
-	ErrInvalidContractAddress    = errors.New("contract address is invalid")
-	ErrContractAddressAlreadySet = errors.New("contract address is already set")
-	ErrNonPositiveVestingAmount  = errors.New("vesting amount cannot be less than or equal to zero")
+	ErrNoBeneficiaries                = errors.New("no beneficiaries provided")
+	ErrArraysLengthMismatch           = errors.New("beneficiaries and amounts arrays length mismatch")
+	ErrTotalSupplyReached             = errors.New("total supply reached for vesting type")
+	ErrZeroVestingAmount              = errors.New("vesting amount cannot be zero")
+	ErrBeneficiaryAlreadyExists       = errors.New("beneficiary already exists")
+	ErrCannotBeZero                   = errors.New("startTimestamp cannot be zero")
+	ErrInvalidUserAddress             = errors.New("beneficiary address cannot be zero")
+	ErrInvalidContractAddress         = errors.New("contract address is invalid")
+	ErrContractAddressAlreadySet      = errors.New("contract address is already set")
+	ErrNonPositiveVestingAmount       = errors.New("vesting amount cannot be less than or equal to zero")
+	ErrNothingToClaim                 = errors.New("Nothing to claim")
+	ErrNothingToClaimAsAlreadyClaimed = errors.New("Nothing to claim: already claimed all allocations")
 )
 
 type CustomError struct {

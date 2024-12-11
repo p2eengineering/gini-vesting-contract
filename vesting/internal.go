@@ -60,19 +60,19 @@ func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 		return fmt.Errorf("%w: %s", ErrBeneficiaryAlreadyExists, beneficiary)
 	}
 
-	err = SetBeneficiary(ctx, fmt.Sprintf("beneficiaries_%s_%s", vestingID, beneficiary), &Beneficiary{
+	err = SetBeneficiary(ctx, vestingID, beneficiary, &Beneficiary{
 		TotalAllocations: amount,
 		ClaimedAmount:    "0",
 	})
 
-	userVestingList, err := GetUserVesting(ctx, fmt.Sprintf("uservestings_%s", beneficiary))
+	userVestingList, err := GetUserVesting(ctx, beneficiary)
 	if err != nil {
 		return fmt.Errorf("failed to get vesting list: %v", err)
 	}
 
 	userVestingList = append(userVestingList, vestingID)
 
-	err = SetUserVesting(ctx, fmt.Sprintf("uservestings_%s", beneficiary), userVestingList)
+	err = SetUserVesting(ctx, beneficiary, userVestingList)
 	if err != nil {
 		return fmt.Errorf("failed to update vesting list: %v", err)
 	}
