@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
-	"time"
 
 	"github.com/p2eengineering/kalp-sdk-public/kalpsdk"
 )
@@ -194,7 +193,7 @@ func (s *SmartContract) CalculateClaimAmount(ctx kalpsdk.TransactionContextInter
 		return "0", fmt.Errorf("failed to get beneficiary data for vestingID %s: %v", vestingID, err)
 	}
 
-	fmt.Println("vesting --------> ", vesting)
+	fmt.Println("vestingPeriod --------> ", vesting)
 
 	beneficiaryClaimedAmount, ok := new(big.Int).SetString(beneficiary.ClaimedAmount, 10)
 	if !ok {
@@ -215,10 +214,10 @@ func (s *SmartContract) CalculateClaimAmount(ctx kalpsdk.TransactionContextInter
 	}
 
 	// Calculate initial unlock
-	currentTime := time.Now().Unix()
-	fmt.Println("uint64(currentTime) <= vesting.CliffStartTimestamp --------> ", uint64(currentTime), vesting.CliffStartTimestamp, uint64(currentTime) <= vesting.CliffStartTimestamp)
+	currentTime, _ := ctx.GetTxTimestamp()
+	fmt.Println("uint64(currentTime) <= vesting.CliffStartTimestamp --------> ", uint64(currentTime.Seconds), vesting.CliffStartTimestamp, uint64(currentTime.Seconds) <= vesting.CliffStartTimestamp)
 
-	if uint64(currentTime) <= vesting.CliffStartTimestamp {
+	if uint64(currentTime.Seconds) <= vesting.CliffStartTimestamp {
 		return "0", nil
 	}
 
@@ -228,21 +227,26 @@ func (s *SmartContract) CalculateClaimAmount(ctx kalpsdk.TransactionContextInter
 
 	// Calculate claimable amount
 	claimableAmount := CalculateClaimableAmount(
-		uint64(currentTime),
+		uint64(currentTime.Seconds),
 		beneficiaryTotalAllocations,
 		vesting.StartTimestamp,
 		vesting.Duration,
 		initialUnlock,
 	)
 
-	fmt.Println("claimableAmount --------> ", claimableAmount)
+	fmt.Println("claimableAmount --------> ", claimableAmount, beneficiaryClaimedAmount)
 
 	claimAmount := new(big.Int)
 	claimAmount.Add(claimableAmount, initialUnlock)
 	claimAmount.Sub(claimAmount, beneficiaryClaimedAmount)
 
+	fmt.Println("claimAmount --------> ", claimAmount.String())
+
 	// Validate claim amount does not exceed total allocations
-	if claimAmount.Add(claimableAmount, initialUnlock).Cmp(beneficiaryTotalAllocations) > 0 {
+	claimAmountExceeds := new(big.Int)
+	claimAmountExceeds.Add(claimAmountExceeds, claimAmount)
+	claimAmountExceeds.Add(claimAmountExceeds, beneficiaryClaimedAmount)
+	if claimAmountExceeds.Cmp(beneficiaryTotalAllocations) > 0 {
 		return "0", fmt.Errorf("claim amount exceeds vesting amount for vesting ID %s and beneficiary %s: claimAmount=%d, totalAllocations=%d",
 			vestingID, beneficiaryAddress, claimAmount, beneficiary.TotalAllocations)
 	}
@@ -254,7 +258,7 @@ func (s *SmartContract) CalculateClaimAmount(ctx kalpsdk.TransactionContextInter
 
 func CalculateInitialUnlock(totalAllocations *big.Int, initialUnlockPercentage uint64) *big.Int {
 	fmt.Println("input arguments ----------->", initialUnlockPercentage, totalAllocations)
-	
+
 	if initialUnlockPercentage == 0 {
 		return big.NewInt(0)
 	}
@@ -304,12 +308,16 @@ func CalculateClaimableAmount(
 	durationBig := big.NewInt(int64(duration))
 	fmt.Println("durationBig --------> ", durationBig)
 
+	durationBig.Div(durationBig, big.NewInt(claimInterval))
+
 	claimable := new(big.Int).Mul(allocationsAfterUnlock, elapsed)
-	fmt.Println("claimable --------> ", claimable)
+	fmt.Println("claimable, durationBig --------> ", claimable, durationBig)
 
 	claimable.Div(claimable, durationBig)
-	claimIntervalInBigInt := big.NewInt(claimInterval)
-	claimable.Div(claimable, claimIntervalInBigInt)
+	// fmt.Println("claimable --------> ", claimable)
+
+	// claimIntervalInBigInt := big.NewInt(claimInterval)
+	// claimable.Div(claimable, claimIntervalInBigInt)
 
 	fmt.Println("claimable --------> ", claimable)
 
@@ -649,7 +657,11 @@ func (s *SmartContract) Claim(ctx kalpsdk.TransactionContextInterface, vestingID
 	if totalClaimsBytes != nil {
 		totalClaims.SetString(string(totalClaimsBytes), 10)
 	}
+	fmt.Println("totalClaims before ---------->", totalClaims)
+
 	totalClaims.Add(totalClaims, amountToClaimInInt)
+
+	fmt.Println("totalClaims after ---------->", totalClaims)
 
 	if err := ctx.PutStateWithoutKYC(totalClaimsKey, []byte(totalClaims.String())); err != nil {
 		return fmt.Errorf("failed to update total claims for vesting ID %s: %v", vestingID, err)
@@ -665,7 +677,11 @@ func (s *SmartContract) Claim(ctx kalpsdk.TransactionContextInterface, vestingID
 	if totalClaimsForAllBytes != nil {
 		totalClaimsForAll.SetString(string(totalClaimsForAllBytes), 10)
 	}
+	fmt.Println("totalClaimsForAll before ---------->", totalClaimsForAll)
+
 	totalClaimsForAll.Add(totalClaimsForAll, amountToClaimInInt)
+
+	fmt.Println("totalClaimsForAll after ---------->", totalClaimsForAll)
 
 	if err := ctx.PutStateWithoutKYC("total_claims_for_all", []byte(totalClaimsForAll.String())); err != nil {
 		return fmt.Errorf("failed to update total claims for all vestings: %v", err)
