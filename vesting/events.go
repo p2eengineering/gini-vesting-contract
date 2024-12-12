@@ -21,6 +21,12 @@ type BeneficiariesAddedEvent struct {
 	TotalAllocations string
 }
 
+type ClaimEvent struct {
+	Signer        string
+	VestingID     string
+	AmountToClaim string
+}
+
 func EmitVestingInitialized(sdk kalpsdk.TransactionContextInterface, vestingID string,
 	cliffDuration,
 	startTimestamp,
@@ -60,6 +66,26 @@ func EmitBeneficiariesAdded(sdk kalpsdk.TransactionContextInterface, vestingID s
 	}
 
 	err = sdk.SetEvent("BeneficiariesAdded", beneficiaryJSON)
+	if err != nil {
+		return fmt.Errorf("failed to set event: %v", err)
+	}
+
+	return nil
+}
+
+func EmitClaim(sdk kalpsdk.TransactionContextInterface, signer, vestingID, amountToClaim string) error {
+	claim := ClaimEvent{
+		Signer:        signer,
+		VestingID:     vestingID,
+		AmountToClaim: amountToClaim,
+	}
+
+	claimJSON, err := json.Marshal(claim)
+	if err != nil {
+		return fmt.Errorf("failed to obtain JSON encoding: %v", err)
+	}
+
+	err = sdk.SetEvent("Claim", claimJSON)
 	if err != nil {
 		return fmt.Errorf("failed to set event: %v", err)
 	}

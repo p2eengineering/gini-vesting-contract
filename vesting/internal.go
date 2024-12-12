@@ -79,3 +79,52 @@ func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 
 	return nil
 }
+
+func calcInitialUnlock(totalAllocations *big.Int, initialUnlockPercentage uint64) *big.Int {
+
+	if initialUnlockPercentage == 0 {
+		return big.NewInt(0)
+	}
+
+	percentage := big.NewInt(int64(initialUnlockPercentage))
+
+	result := new(big.Int).Mul(totalAllocations, percentage)
+	return result.Div(result, big.NewInt(100))
+}
+
+func calcClaimableAmount(
+	timestamp uint64,
+	totalAllocations *big.Int,
+	startTimestamp,
+	duration uint64,
+	initialUnlock *big.Int,
+) *big.Int {
+
+	if timestamp < startTimestamp {
+		return big.NewInt(0)
+	}
+
+	elapsedIntervals := (timestamp - startTimestamp) / claimInterval
+
+	if elapsedIntervals == 0 {
+		return big.NewInt(0)
+	}
+
+	// If the timestamp is beyond the total duration, return the remaining amount
+	endTimestamp := startTimestamp + duration
+
+	if timestamp > endTimestamp {
+		return new(big.Int).Sub(totalAllocations, initialUnlock)
+	}
+
+	// Calculate claimable amount
+	allocationsAfterUnlock := new(big.Int).Sub(totalAllocations, initialUnlock)
+
+	elapsed := big.NewInt(int64(elapsedIntervals))
+	durationBig := big.NewInt(int64(duration))
+	durationBig.Div(durationBig, big.NewInt(claimInterval))
+	claimable := new(big.Int).Mul(allocationsAfterUnlock, elapsed)
+	claimable.Div(claimable, durationBig)
+
+	return claimable
+}

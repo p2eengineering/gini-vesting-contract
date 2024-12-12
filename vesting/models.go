@@ -3,6 +3,7 @@ package vesting
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
 
 	"github.com/p2eengineering/kalp-sdk-public/kalpsdk"
@@ -164,4 +165,140 @@ func SetUserVesting(ctx kalpsdk.TransactionContextInterface, beneficiaryID strin
 	}
 
 	return nil
+}
+
+// GetTotalClaimsForAll retrieves the total claims for all vestings from the state
+func GetTotalClaimsForAll(ctx kalpsdk.TransactionContextInterface) (*big.Int, error) {
+	// Key for total claims for all vestings
+	totalClaimsKey := "total_claims_for_all"
+
+	// Retrieve the state
+	totalClaimsAsBytes, err := ctx.GetState(totalClaimsKey)
+	if err != nil {
+		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get total claims with Key %s", totalClaimsKey), err)
+	}
+	if totalClaimsAsBytes == nil {
+		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("total claims with Key %s does not exist", totalClaimsKey), nil)
+	}
+
+	// Convert the byte data to big.Int
+	totalClaims := new(big.Int)
+	err = totalClaims.UnmarshalText(totalClaimsAsBytes)
+	if err != nil {
+		return nil, NewCustomError(http.StatusInternalServerError, "failed to unmarshal total claims", err)
+	}
+
+	return totalClaims, nil
+}
+
+// SetTotalClaimsForAll sets the total claims for all vestings in the state
+func SetTotalClaimsForAll(ctx kalpsdk.TransactionContextInterface, totalClaims *big.Int) error {
+	totalClaimsKey := "total_claims_for_all"
+
+	totalClaimsAsBytes, err := totalClaims.MarshalText()
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, "failed to marshal total claims", err)
+	}
+
+	err = ctx.PutStateWithoutKYC(totalClaimsKey, totalClaimsAsBytes)
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, "failed to set total claims", err)
+	}
+
+	return nil
+}
+
+// GetTotalClaims retrieves the total claims for a specific vesting ID from the state
+func GetTotalClaims(ctx kalpsdk.TransactionContextInterface, vestingID string) (*big.Int, error) {
+	totalClaimsKey := fmt.Sprintf("total_claims_%s", vestingID)
+
+	totalClaimsAsBytes, err := ctx.GetState(totalClaimsKey)
+	if err != nil {
+		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get total claims with Key %s", totalClaimsKey), err)
+	}
+	if totalClaimsAsBytes == nil {
+		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("total claims with Key %s does not exist", totalClaimsKey), nil)
+	}
+
+	totalClaims := new(big.Int)
+	err = totalClaims.UnmarshalText(totalClaimsAsBytes)
+	if err != nil {
+		return nil, NewCustomError(http.StatusInternalServerError, "failed to unmarshal total claims", err)
+	}
+
+	return totalClaims, nil
+}
+
+// SetTotalClaims sets the total claims for a specific vesting ID in the state
+func SetTotalClaims(ctx kalpsdk.TransactionContextInterface, vestingID string, totalClaims *big.Int) error {
+	totalClaimsKey := fmt.Sprintf("total_claims_%s", vestingID)
+
+	totalClaimsAsBytes, err := totalClaims.MarshalText()
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, "failed to marshal total claims", err)
+	}
+
+	err = ctx.PutStateWithoutKYC(totalClaimsKey, totalClaimsAsBytes)
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to set total claims for vesting ID %s", vestingID), err)
+	}
+
+	return nil
+}
+
+// GetGiniTokenAddress retrieves the Gini Token address from the blockchain state
+func GetGiniTokenAddress(ctx kalpsdk.TransactionContextInterface) (string, error) {
+	giniTokenAddressBytes, err := ctx.GetState(giniTokenKey)
+	if err != nil {
+		return "", NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get Gini token address with Key %s", giniTokenKey), err)
+	}
+
+	// Check if the Gini token address exists
+	if giniTokenAddressBytes == nil || len(giniTokenAddressBytes) == 0 {
+		return "", NewCustomError(http.StatusNotFound, fmt.Sprintf("Gini token address with Key %s does not exist", giniTokenKey), nil)
+	}
+
+	return string(giniTokenAddressBytes), nil
+}
+
+// SetGiniTokenAddress sets the Gini Token address in the blockchain state
+func SetGiniTokenAddress(ctx kalpsdk.TransactionContextInterface, tokenAddress string) error {
+	existingAddress, err := ctx.GetState(giniTokenKey)
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get Gini token address with Key %s", giniTokenKey), err)
+	}
+	if existingAddress != nil && string(existingAddress) != "" {
+		return NewCustomError(http.StatusConflict, "Gini token address is already set", nil)
+	}
+
+	// Store the new Gini token address in the state
+	err = ctx.PutStateWithoutKYC(giniTokenKey, []byte(tokenAddress))
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to set Gini token address with Key %s", giniTokenKey), err)
+	}
+
+	return nil
+}
+
+// GetClaimedAmount retrieves the total claimed amount for a specific vesting ID from the blockchain state
+func GetClaimedAmount(ctx kalpsdk.TransactionContextInterface, vestingID string) (*big.Int, error) {
+	// Key for the claimed amount specific to the vesting ID
+	claimedAmountKey := fmt.Sprintf("total_claims_%s", vestingID)
+
+	// Retrieve the claimed amount from state
+	claimedAmountBytes, err := ctx.GetState(claimedAmountKey)
+	if err != nil {
+		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get claimed amount for vesting ID %s", vestingID), err)
+	}
+
+	// Initialize claimedAmount as 0 if no state is found
+	claimedAmount := big.NewInt(0)
+	if claimedAmountBytes != nil {
+		_, success := claimedAmount.SetString(string(claimedAmountBytes), 10)
+		if !success {
+			return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to parse claimed amount for vesting ID %s", vestingID), nil)
+		}
+	}
+
+	return claimedAmount, nil
 }

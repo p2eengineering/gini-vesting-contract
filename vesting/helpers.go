@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math/big"
+	"net/http"
 	"regexp"
 	"strings"
 
@@ -67,4 +68,17 @@ func ConvertGiniToWei(giniAmount uint64) string {
 
 	// Convert weiAmount to string and return
 	return weiAmount.String()
+}
+
+func IsSignerKalpFoundation(ctx kalpsdk.TransactionContextInterface) error {
+	signer, err := GetUserId(ctx)
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, "failed to get client id", err)
+	}
+
+	if signer != kalpFoundation {
+		return NewCustomError(http.StatusBadRequest, "only kalp foundation can set the contract name GiniToken", err)
+	}
+
+	return nil
 }
