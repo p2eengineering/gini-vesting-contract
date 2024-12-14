@@ -12,47 +12,47 @@ import (
 type UserVestings []string
 
 type UserVestingsData struct {
-	UserVestings []string
+	UserVestings []string `json:"userVestings"`
 }
 
 type Beneficiary struct {
-	TotalAllocations string
-	ClaimedAmount    string
+	TotalAllocations string `json:"totalAllocations"`
+	ClaimedAmount    string `json:"claimedAmount"`
 }
 
 type VestingPeriod struct {
-	TotalSupply         string
-	CliffStartTimestamp uint64
-	StartTimestamp      uint64
-	EndTimestamp        uint64
-	Duration            uint64
-	TGE                 uint64
+	TotalSupply         string `json:"totalSupply"`
+	CliffStartTimestamp uint64 `json:"cliffStartTimestamp"`
+	StartTimestamp      uint64 `json:"startTimestamp"`
+	EndTimestamp        uint64 `json:"endTimestamp"`
+	Duration            uint64 `json:"duration"`
+	TGE                 uint64 `json:"tge"`
 }
 
 type VestingData struct {
-	VestingPeriod *VestingPeriod
-	ClaimedAmount string
+	VestingPeriod *VestingPeriod `json:"vestingPeriod"`
+	ClaimedAmount string         `json:"claimedAmount"`
 }
 
 type ClaimsWithAllVestings struct {
-	TotalAmount  string
-	UserVestings []string
-	Amounts      []string
+	TotalAmount  string   `json:"totalAmount"`
+	UserVestings []string `json:"userVestings"`
+	Amounts      []string `json:"amounts"`
 }
 
 type VestingDurationsData struct {
-	UserVestings     []string
-	VestingDurations []uint64
+	UserVestings     []string `json:"userVestings"`
+	VestingDurations []uint64 `json:"vestingDurations"`
 }
 
 type AllocationsWithAllVestings struct {
-	UserVestings     []string
-	TotalAllocations []string
+	UserVestings     []string `json:"userVestings"`
+	TotalAllocations []string `json:"totalAllocations"`
 }
 
 type TotalClaimsWithAllVestings struct {
-	UserVestings []string
-	TotalClaims  []string
+	UserVestings []string `json:"userVestings"`
+	TotalClaims  []string `json:"totalClaims"`
 }
 
 // GetBeneficiary retrieves a Beneficiary by ID
@@ -216,9 +216,6 @@ func GetTotalClaims(ctx kalpsdk.TransactionContextInterface, vestingID string) (
 	if err != nil {
 		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get total claims with Key %s", totalClaimsKey), err)
 	}
-	if totalClaimsAsBytes == nil {
-		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("total claims with Key %s does not exist", totalClaimsKey), nil)
-	}
 
 	totalClaims := new(big.Int)
 	err = totalClaims.UnmarshalText(totalClaimsAsBytes)
@@ -246,6 +243,21 @@ func SetTotalClaims(ctx kalpsdk.TransactionContextInterface, vestingID string, t
 	return nil
 }
 
+// GetGiniTokenAddressForSetToken retrieves the Gini Token address from the blockchain state
+func GetGiniTokenAddressForSetToken(ctx kalpsdk.TransactionContextInterface) (string, error) {
+	giniTokenAddressBytes, err := ctx.GetState(giniTokenKey)
+	if err != nil {
+		return "", NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get Gini token address with Key %s", giniTokenKey), err)
+	}
+
+	// Check if the Gini token address exists
+	if len(giniTokenAddressBytes) == 0 {
+		return "", nil
+	}
+
+	return string(giniTokenAddressBytes), nil
+}
+
 // GetGiniTokenAddress retrieves the Gini Token address from the blockchain state
 func GetGiniTokenAddress(ctx kalpsdk.TransactionContextInterface) (string, error) {
 	giniTokenAddressBytes, err := ctx.GetState(giniTokenKey)
@@ -254,7 +266,7 @@ func GetGiniTokenAddress(ctx kalpsdk.TransactionContextInterface) (string, error
 	}
 
 	// Check if the Gini token address exists
-	if giniTokenAddressBytes == nil || len(giniTokenAddressBytes) == 0 {
+	if len(giniTokenAddressBytes) == 0 {
 		return "", NewCustomError(http.StatusNotFound, fmt.Sprintf("Gini token address with Key %s does not exist", giniTokenKey), nil)
 	}
 
@@ -278,27 +290,4 @@ func SetGiniTokenAddress(ctx kalpsdk.TransactionContextInterface, tokenAddress s
 	}
 
 	return nil
-}
-
-// GetClaimedAmount retrieves the total claimed amount for a specific vesting ID from the blockchain state
-func GetClaimedAmount(ctx kalpsdk.TransactionContextInterface, vestingID string) (*big.Int, error) {
-	// Key for the claimed amount specific to the vesting ID
-	claimedAmountKey := fmt.Sprintf("total_claims_%s", vestingID)
-
-	// Retrieve the claimed amount from state
-	claimedAmountBytes, err := ctx.GetState(claimedAmountKey)
-	if err != nil {
-		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get claimed amount for vesting ID %s", vestingID), err)
-	}
-
-	// Initialize claimedAmount as 0 if no state is found
-	claimedAmount := big.NewInt(0)
-	if claimedAmountBytes != nil {
-		_, success := claimedAmount.SetString(string(claimedAmountBytes), 10)
-		if !success {
-			return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to parse claimed amount for vesting ID %s", vestingID), nil)
-		}
-	}
-
-	return claimedAmount, nil
 }

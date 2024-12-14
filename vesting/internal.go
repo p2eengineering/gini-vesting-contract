@@ -57,7 +57,7 @@ func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 	}
 
 	if beneficiaryJSON != nil {
-		return fmt.Errorf("%w: %s", ErrBeneficiaryAlreadyExists, beneficiary)
+		return ErrBeneficiaryAlreadyExists(beneficiary)
 	}
 
 	err = SetBeneficiary(ctx, vestingID, beneficiary, &Beneficiary{

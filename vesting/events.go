@@ -22,12 +22,12 @@ type BeneficiariesAddedEvent struct {
 }
 
 type ClaimEvent struct {
-	Signer        string
-	VestingID     string
-	AmountToClaim string
+	User      string
+	VestingID string
+	Amount    string
 }
 
-func EmitVestingInitialized(sdk kalpsdk.TransactionContextInterface, vestingID string,
+func EmitVestingInitialized(ctx kalpsdk.TransactionContextInterface, vestingID string,
 	cliffDuration,
 	startTimestamp,
 	duration uint64,
@@ -46,7 +46,7 @@ func EmitVestingInitialized(sdk kalpsdk.TransactionContextInterface, vestingID s
 		return fmt.Errorf("failed to obtain JSON encoding: %v", err)
 	}
 
-	err = sdk.SetEvent("VestingInitialized", vestingPeriodJSON)
+	err = ctx.SetEvent(VestingInitializedKey, vestingPeriodJSON)
 	if err != nil {
 		return fmt.Errorf("failed to set event: %v", err)
 	}
@@ -54,7 +54,7 @@ func EmitVestingInitialized(sdk kalpsdk.TransactionContextInterface, vestingID s
 	return nil
 }
 
-func EmitBeneficiariesAdded(sdk kalpsdk.TransactionContextInterface, vestingID string, totalAllocations string) error {
+func EmitBeneficiariesAdded(ctx kalpsdk.TransactionContextInterface, vestingID string, totalAllocations string) error {
 	beneficiary := BeneficiariesAddedEvent{
 		VestingID:        vestingID,
 		TotalAllocations: totalAllocations,
@@ -65,7 +65,7 @@ func EmitBeneficiariesAdded(sdk kalpsdk.TransactionContextInterface, vestingID s
 		return fmt.Errorf("failed to obtain JSON encoding: %v", err)
 	}
 
-	err = sdk.SetEvent("BeneficiariesAdded", beneficiaryJSON)
+	err = ctx.SetEvent(BeneficiariesAddedKey, beneficiaryJSON)
 	if err != nil {
 		return fmt.Errorf("failed to set event: %v", err)
 	}
@@ -73,11 +73,28 @@ func EmitBeneficiariesAdded(sdk kalpsdk.TransactionContextInterface, vestingID s
 	return nil
 }
 
-func EmitClaim(sdk kalpsdk.TransactionContextInterface, signer, vestingID, amountToClaim string) error {
+func EmitSetGiniToken(ctx kalpsdk.TransactionContextInterface, tokenAddress string) error {
+	event := map[string]interface{}{
+		"token": tokenAddress,
+	}
+	eventBytes, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal event data: %v", err)
+	}
+
+	err = ctx.SetEvent(giniTokenEvent, eventBytes)
+	if err != nil {
+		return fmt.Errorf("failed to emit SetGiniToken event: %v", err)
+	}
+
+	return nil
+}
+
+func EmitClaim(ctx kalpsdk.TransactionContextInterface, user, vestingID, amount string) error {
 	claim := ClaimEvent{
-		Signer:        signer,
-		VestingID:     vestingID,
-		AmountToClaim: amountToClaim,
+		User:      user,
+		VestingID: vestingID,
+		Amount:    amount,
 	}
 
 	claimJSON, err := json.Marshal(claim)
@@ -85,7 +102,7 @@ func EmitClaim(sdk kalpsdk.TransactionContextInterface, signer, vestingID, amoun
 		return fmt.Errorf("failed to obtain JSON encoding: %v", err)
 	}
 
-	err = sdk.SetEvent("Claim", claimJSON)
+	err = ctx.SetEvent(ClaimKey, claimJSON)
 	if err != nil {
 		return fmt.Errorf("failed to set event: %v", err)
 	}

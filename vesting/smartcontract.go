@@ -1,7 +1,6 @@
 package vesting
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -32,26 +31,11 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 	}
 
 	if beneficiaryJSON != nil {
-		return fmt.Errorf("Contract is already initialised as %w: %s", ErrBeneficiaryAlreadyExists, kalpFoundationBeneficiaryKey)
+		return fmt.Errorf("Contract is already initialised as %w: %s", ErrBeneficiaryAlreadyExists(kalpFoundationBeneficiaryKey))
 	}
 
 	// Initialize different vesting periods
-	validateNSetVesting(ctx, Team.String(), 30*12*24*60*60, startTimestamp, 30*24*24*60*60, ConvertGiniToWei(300000000), 0)
-	validateNSetVesting(ctx, Foundation.String(), 0, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(220000000), 0)
-	validateNSetVesting(ctx, AngelRound.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(20000000), 0)
-	validateNSetVesting(ctx, SeedRound.String(), 30*10*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(40000000), 0)
-	validateNSetVesting(ctx, PrivateRound1.String(), 30*12*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(140000000), 0)
-	validateNSetVesting(ctx, PrivateRound2.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(60000000), 0)
-	validateNSetVesting(ctx, Advisors.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(30000000), 0)
-	validateNSetVesting(ctx, KOLRound.String(), 30*3*24*60*60, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(30000000), 25)
-	validateNSetVesting(ctx, Marketing.String(), 30*1*24*60*60, startTimestamp, 30*18*24*60*60, ConvertGiniToWei(80000000), 10)
-	validateNSetVesting(ctx, StakingRewards.String(), 30*3*24*60*60, startTimestamp, 30*24*24*60*60, ConvertGiniToWei(180000000), 0)
-	validateNSetVesting(ctx, EcosystemReserve.String(), 0, startTimestamp, 30*150*24*60*60, ConvertGiniToWei(560000000), 2)
-	validateNSetVesting(ctx, Airdrop.String(), 30*6*24*60*60, startTimestamp, 30*9*24*60*60, ConvertGiniToWei(80000000), 10)
-	validateNSetVesting(ctx, LiquidityPool.String(), 0, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(200000000), 25)
-	validateNSetVesting(ctx, PublicAllocation.String(), 30*3*24*60*60, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(60000000), 25)
-
-	// validateNSetVesting(ctx, Team.String(), 2*60, startTimestamp, 12*60, ConvertGiniToWei(300000000), 0)
+	// validateNSetVesting(ctx, Team.String(), 30*12*24*60*60, startTimestamp, 30*24*24*60*60, ConvertGiniToWei(300000000), 0)
 	// validateNSetVesting(ctx, Foundation.String(), 0, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(220000000), 0)
 	// validateNSetVesting(ctx, AngelRound.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(20000000), 0)
 	// validateNSetVesting(ctx, SeedRound.String(), 30*10*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(40000000), 0)
@@ -59,12 +43,27 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 	// validateNSetVesting(ctx, PrivateRound2.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(60000000), 0)
 	// validateNSetVesting(ctx, Advisors.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(30000000), 0)
 	// validateNSetVesting(ctx, KOLRound.String(), 30*3*24*60*60, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(30000000), 25)
-	// validateNSetVesting(ctx, Marketing.String(), 2*60, startTimestamp, 12*60, ConvertGiniToWei(80000000), 10)
+	// validateNSetVesting(ctx, Marketing.String(), 30*1*24*60*60, startTimestamp, 30*18*24*60*60, ConvertGiniToWei(80000000), 10)
 	// validateNSetVesting(ctx, StakingRewards.String(), 30*3*24*60*60, startTimestamp, 30*24*24*60*60, ConvertGiniToWei(180000000), 0)
-	// validateNSetVesting(ctx, EcosystemReserve.String(), 0, startTimestamp, 12*60, ConvertGiniToWei(560000000), 2)
+	// validateNSetVesting(ctx, EcosystemReserve.String(), 0, startTimestamp, 30*150*24*60*60, ConvertGiniToWei(560000000), 2)
 	// validateNSetVesting(ctx, Airdrop.String(), 30*6*24*60*60, startTimestamp, 30*9*24*60*60, ConvertGiniToWei(80000000), 10)
 	// validateNSetVesting(ctx, LiquidityPool.String(), 0, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(200000000), 25)
 	// validateNSetVesting(ctx, PublicAllocation.String(), 30*3*24*60*60, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(60000000), 25)
+
+	validateNSetVesting(ctx, Team.String(), 2*60, startTimestamp, 12*60, ConvertGiniToWei(300000000), 0)
+	validateNSetVesting(ctx, Foundation.String(), 0, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(220000000), 0)
+	validateNSetVesting(ctx, AngelRound.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(20000000), 0)
+	validateNSetVesting(ctx, SeedRound.String(), 30*10*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(40000000), 0)
+	validateNSetVesting(ctx, PrivateRound1.String(), 30*12*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(140000000), 0)
+	validateNSetVesting(ctx, PrivateRound2.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(60000000), 0)
+	validateNSetVesting(ctx, Advisors.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(30000000), 0)
+	validateNSetVesting(ctx, KOLRound.String(), 30*3*24*60*60, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(30000000), 25)
+	validateNSetVesting(ctx, Marketing.String(), 2*60, startTimestamp, 12*60, ConvertGiniToWei(80000000), 10)
+	validateNSetVesting(ctx, StakingRewards.String(), 30*3*24*60*60, startTimestamp, 30*24*24*60*60, ConvertGiniToWei(180000000), 0)
+	validateNSetVesting(ctx, EcosystemReserve.String(), 0, startTimestamp, 12*60, ConvertGiniToWei(560000000), 2)
+	validateNSetVesting(ctx, Airdrop.String(), 30*6*24*60*60, startTimestamp, 30*9*24*60*60, ConvertGiniToWei(80000000), 10)
+	validateNSetVesting(ctx, LiquidityPool.String(), 0, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(200000000), 25)
+	validateNSetVesting(ctx, PublicAllocation.String(), 30*3*24*60*60, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(60000000), 25)
 
 	err = SetBeneficiary(ctx, EcosystemReserve.String(), kalpFoundationKey, &Beneficiary{
 		TotalAllocations: kalpFoundationTotalAllocations,
@@ -73,6 +72,10 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 	if err != nil {
 		return NewCustomError(http.StatusInternalServerError, "failed to set beneficiaries", err)
 	}
+
+	EmitBeneficiariesAdded(ctx, EcosystemReserve.String(), kalpFoundationTotalAllocations)
+
+	EmitClaim(ctx, kalpFoundation, EcosystemReserve.String(), kalpFoundationClaimedAmount)
 
 	userVestingList := UserVestings{EcosystemReserve.String()}
 	err = SetUserVesting(ctx, kalpFoundationUserVestingKey, userVestingList)
@@ -125,7 +128,7 @@ func (s *SmartContract) AddBeneficiaries(ctx kalpsdk.TransactionContextInterface
 	}
 
 	if vestingTotalSupply.Cmp(totalAllocations) < 0 {
-		return NewCustomError(http.StatusBadRequest, fmt.Sprintf("%w: vesting type %d", ErrTotalSupplyReached, vestingID), nil)
+		return ErrTotalSupplyReached(vestingID)
 	}
 
 	vestingTotalSupply.Sub(vestingTotalSupply, totalAllocations)
@@ -147,9 +150,13 @@ func (s *SmartContract) SetGiniToken(ctx kalpsdk.TransactionContextInterface, to
 		return ErrInvalidContractAddress(tokenAddress)
 	}
 
-	_, err := GetGiniTokenAddress(ctx)
+	tokenAddress, err := GetGiniTokenAddressForSetToken(ctx)
 	if err != nil {
 		return err
+	}
+
+	if len(tokenAddress) != 0 {
+		return ErrTokenAlreadySet
 	}
 
 	err = SetGiniTokenAddress(ctx, tokenAddress)
@@ -157,18 +164,7 @@ func (s *SmartContract) SetGiniToken(ctx kalpsdk.TransactionContextInterface, to
 		return fmt.Errorf("failed to set gini token: %v", err)
 	}
 
-	event := map[string]interface{}{
-		"token": tokenAddress,
-	}
-	eventBytes, err := json.Marshal(event)
-	if err != nil {
-		return fmt.Errorf("failed to marshal event data: %v", err)
-	}
-
-	err = ctx.SetEvent(giniTokenEvent, eventBytes)
-	if err != nil {
-		return fmt.Errorf("failed to emit SetGiniToken event: %v", err)
-	}
+	EmitSetGiniToken(ctx, tokenAddress)
 
 	return nil
 }
@@ -227,8 +223,7 @@ func (s *SmartContract) CalculateClaimAmount(ctx kalpsdk.TransactionContextInter
 	claimAmountExceeds := new(big.Int).Set(claimAmount)
 	claimAmountExceeds.Add(claimAmountExceeds, beneficiaryClaimedAmount)
 	if claimAmountExceeds.Cmp(beneficiaryTotalAllocations) > 0 {
-		return "0", fmt.Errorf("claim amount exceeds vesting amount for vesting ID %s and beneficiary %s: claimAmount=%d, totalAllocations=%d",
-			vestingID, beneficiaryAddress, claimAmount, beneficiary.TotalAllocations)
+		return "0", ErrClaimAmountExceedsVestingAmount(vestingID, beneficiaryAddress, claimAmount.String(), beneficiary.TotalAllocations)
 	}
 
 	logger.Infoln("CalculateClaimAmount Invoked complete.... with output ", claimAmount.String())
@@ -245,7 +240,7 @@ func (s *SmartContract) GetVestingData(ctx kalpsdk.TransactionContextInterface, 
 		return nil, fmt.Errorf("unable to get vesting: %v", err)
 	}
 
-	claimedAmount, err := GetClaimedAmount(ctx, vestingID)
+	claimedAmount, err := GetTotalClaims(ctx, vestingID)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +256,7 @@ func (s *SmartContract) GetVestingData(ctx kalpsdk.TransactionContextInterface, 
 func (s *SmartContract) ClaimAll(ctx kalpsdk.TransactionContextInterface, beneficiary string) error {
 	logger := kalpsdk.NewLogger()
 	logger.Infoln("GetVestingData Invoked.... with arguments ", beneficiary)
-	
+
 	signer, err := GetUserId(ctx)
 	if err != nil {
 		return NewCustomError(http.StatusInternalServerError, "failed to get client id", err)
@@ -335,8 +330,14 @@ func (s *SmartContract) ClaimAll(ctx kalpsdk.TransactionContextInterface, benefi
 		return fmt.Errorf("failed to update total claims for all vestings: %v", err)
 	}
 
+	giniContract, err := GetGiniTokenAddress(ctx)
+	if err != nil {
+		return err
+	}
+
+	// TODO: check this on stagenet also
 	// Simulate transfer of tokens (in a real system, you would interact with a token contract or handle appropriately)
-	output := ctx.InvokeChaincode(crossCC_GINI_Contract, [][]byte{[]byte(crossCC_GINI_Transfer), []byte(signer), []byte(totalClaimAmount.String())}, Channel)
+	output := ctx.InvokeChaincode(giniContract, [][]byte{[]byte(giniTransfer), []byte(signer), []byte(totalClaimAmount.String())}, Channel)
 
 	b, _ := strconv.ParseBool(string(output.Payload))
 	if !b {
@@ -574,9 +575,16 @@ func (s *SmartContract) Claim(ctx kalpsdk.TransactionContextInterface, vestingID
 	// Emit Claim event (can be implemented as needed in your system)
 	EmitClaim(ctx, signer, vestingID, amountToClaim)
 
-	// Simulate transfer of tokens (in a real system, you would interact with a token contract or handle appropriately)
-	output := ctx.InvokeChaincode(crossCC_GINI_Contract, [][]byte{[]byte(crossCC_GINI_Transfer), []byte(signer), []byte(amountToClaim)}, Channel)
+	giniContract, err := GetGiniTokenAddress(ctx)
+	if err != nil {
+		return err
+	}
 
+	// TODO: check this on stagenet also
+	// Simulate transfer of tokens (in a real system, you would interact with a token contract or handle appropriately)
+	output := ctx.InvokeChaincode(giniContract, [][]byte{[]byte(giniTransfer), []byte(signer), []byte(amountToClaim)}, Channel)
+
+	fmt.Println("output of gini chaincode", output)
 	b, _ := strconv.ParseBool(string(output.Payload))
 	if !b {
 		return NewCustomError(http.StatusInternalServerError, "unable to transfer token", err)

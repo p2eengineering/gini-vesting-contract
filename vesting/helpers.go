@@ -11,8 +11,8 @@ import (
 	"github.com/p2eengineering/kalp-sdk-public/kalpsdk"
 )
 
-func GetUserId(sdk kalpsdk.TransactionContextInterface) (string, error) {
-	b64ID, err := sdk.GetClientIdentity().GetID()
+func GetUserId(ctx kalpsdk.TransactionContextInterface) (string, error) {
+	b64ID, err := ctx.GetClientIdentity().GetID()
 	if err != nil {
 		return "", fmt.Errorf("failed to read clientID: %v", err)
 	}
@@ -77,7 +77,7 @@ func IsSignerKalpFoundation(ctx kalpsdk.TransactionContextInterface) error {
 	}
 
 	if signer != kalpFoundation {
-		return NewCustomError(http.StatusBadRequest, "only kalp foundation can set the contract name GiniToken", err)
+		return NewCustomError(http.StatusBadRequest, "signer is not kalp foundation", err)
 	}
 
 	return nil
