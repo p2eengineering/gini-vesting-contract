@@ -243,31 +243,11 @@ func SetTotalClaims(ctx kalpsdk.TransactionContextInterface, vestingID string, t
 	return nil
 }
 
-// GetGiniTokenAddressForSetToken retrieves the Gini Token address from the blockchain state
-func GetGiniTokenAddressForSetToken(ctx kalpsdk.TransactionContextInterface) (string, error) {
-	giniTokenAddressBytes, err := ctx.GetState(giniTokenKey)
-	if err != nil {
-		return "", NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get Gini token address with Key %s", giniTokenKey), err)
-	}
-
-	// Check if the Gini token address exists
-	if len(giniTokenAddressBytes) == 0 {
-		return "", nil
-	}
-
-	return string(giniTokenAddressBytes), nil
-}
-
 // GetGiniTokenAddress retrieves the Gini Token address from the blockchain state
 func GetGiniTokenAddress(ctx kalpsdk.TransactionContextInterface) (string, error) {
 	giniTokenAddressBytes, err := ctx.GetState(giniTokenKey)
 	if err != nil {
 		return "", NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get Gini token address with Key %s", giniTokenKey), err)
-	}
-
-	// Check if the Gini token address exists
-	if len(giniTokenAddressBytes) == 0 {
-		return "", NewCustomError(http.StatusNotFound, fmt.Sprintf("Gini token address with Key %s does not exist", giniTokenKey), nil)
 	}
 
 	return string(giniTokenAddressBytes), nil

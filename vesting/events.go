@@ -6,25 +6,28 @@ import (
 
 	"github.com/p2eengineering/kalp-sdk-public/kalpsdk"
 )
-
 type VestingPeriodEvent struct {
-	VestingID           string
-	TotalSupply         string
-	CliffStartTimestamp uint64
-	StartTimestamp      uint64
-	EndTimestamp        uint64
-	TGE                 uint64
+	VestingID           string `json:"vestingId"`
+	TotalSupply         string `json:"totalSupply"`
+	CliffStartTimestamp uint64 `json:"cliffStartTimestamp"`
+	StartTimestamp      uint64 `json:"startTimestamp"`
+	EndTimestamp        uint64 `json:"endTimestamp"`
+	TGE                 uint64 `json:"tge"`
 }
 
 type BeneficiariesAddedEvent struct {
-	VestingID        string
-	TotalAllocations string
+	VestingID        string `json:"vestingId"`
+	TotalAllocations string `json:"totalAllocations"`
 }
 
 type ClaimEvent struct {
-	User      string
-	VestingID string
-	Amount    string
+	User      string `json:"user"`
+	VestingID string `json:"vestingId"`
+	Amount    string `json:"amount"`
+}
+
+type SetGiniTokenEvent struct {
+	Token string `json:"token"`
 }
 
 func EmitVestingInitialized(ctx kalpsdk.TransactionContextInterface, vestingID string,
@@ -74,15 +77,15 @@ func EmitBeneficiariesAdded(ctx kalpsdk.TransactionContextInterface, vestingID s
 }
 
 func EmitSetGiniToken(ctx kalpsdk.TransactionContextInterface, tokenAddress string) error {
-	event := map[string]interface{}{
-		"token": tokenAddress,
+	event := SetGiniTokenEvent{
+		Token: tokenAddress,
 	}
 	eventBytes, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal event data: %v", err)
 	}
 
-	err = ctx.SetEvent(giniTokenEvent, eventBytes)
+	err = ctx.SetEvent("giniTokenEvent", eventBytes)
 	if err != nil {
 		return fmt.Errorf("failed to emit SetGiniToken event: %v", err)
 	}

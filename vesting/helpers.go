@@ -82,3 +82,23 @@ func IsSignerKalpFoundation(ctx kalpsdk.TransactionContextInterface) error {
 
 	return nil
 }
+
+func isValidVestingID(vestingID string) bool {
+	validVestingIDs := map[string]bool{
+		"Team":             true,
+		"Foundation":       true,
+		"AngelRound":       true,
+		"SeedRound":        true,
+		"PrivateRound1":    true,
+		"PrivateRound2":    true,
+		"Advisors":         true,
+		"KOLRound":         true,
+		"Marketing":        true,
+		"StakingRewards":   true,
+		"EcosystemReserve": true,
+		"Airdrop":          true,
+		"LiquidityPool":    true,
+		"PublicAllocation": true,
+	}
+	return validVestingIDs[vestingID]
+}

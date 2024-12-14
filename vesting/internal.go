@@ -3,6 +3,8 @@ package vesting
 import (
 	"fmt"
 	"math/big"
+	"net/http"
+	"strconv"
 
 	"github.com/p2eengineering/kalp-sdk-public/kalpsdk"
 )
@@ -37,7 +39,7 @@ func validateNSetVesting(
 }
 
 func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, beneficiary, amount string) error {
-	if IsUserAddressValid(beneficiary) {
+	if !IsUserAddressValid(beneficiary) {
 		return ErrInvalidUserAddress
 	}
 
@@ -127,4 +129,29 @@ func calcClaimableAmount(
 	claimable.Mul(claimable, elapsed)
 
 	return claimable
+}
+
+func TransferGiniTokens(ctx kalpsdk.TransactionContextInterface, signer, totalClaimAmount string) error {
+	giniContract, err := GetGiniTokenAddress(ctx)
+	if err != nil {
+		return err
+	}
+
+	if len(giniContract) == 0 {
+		return NewCustomError(http.StatusNotFound, fmt.Sprintf("Gini token address with Key %s does not exist", giniTokenKey), nil)
+	}
+
+	channel := ctx.GetChannelID()
+
+	// TODO: check this on stagenet also
+	// Simulate transfer of tokens (in a real system, you would interact with a token contract or handle appropriately)
+	output := ctx.InvokeChaincode(giniContract, [][]byte{[]byte("giniTransfer"), []byte(signer), []byte(totalClaimAmount)}, channel)
+
+	b, _ := strconv.ParseBool(string(output.Payload))
+
+	if !b {
+		return NewCustomError(int(output.Status), fmt.Sprintf("unable to transfer token: %s", output.Message), nil)
+	}
+
+	return nil
 }

@@ -3,8 +3,7 @@ package vesting
 type TokenAllocation int
 
 const (
-	// kalpFoundation                 = "0b87970433b22494faff1cc7a819e71bddc7880c"
-	kalpFoundation                 = "user1"
+	kalpFoundation                 = "0b87970433b22494faff1cc7a819e71bddc7880c"
 	kalpFoundationTotalAllocations = "560000000000000000000000000"
 	kalpFoundationClaimedAmount    = "11200000000000000000000000"
 	kalpFoundationBeneficiaryKey   = "beneficiaries_EcosystemReserve_kalp_foundation"
@@ -17,7 +16,6 @@ const (
 	// claimInterval                  = 30 * 24 * 60 * 60
 
 	giniTransfer = "Transfer"
-	Channel      = "kalptantra"
 	giniTokenKey = "giniToken"
 
 	// Events Keys
