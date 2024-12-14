@@ -111,7 +111,7 @@ func (s *SmartContract) AddBeneficiaries(ctx kalpsdk.TransactionContextInterface
 	for i := 0; i < len(beneficiaries); i++ {
 		amount, ok := new(big.Int).SetString(amounts[i], 10)
 		if !ok {
-			return InvalidAmountError("beneficiary", beneficiaries[i], amounts[i])
+			return ErrInvalidAmount("beneficiary", beneficiaries[i], amounts[i])
 		}
 
 		err := addBeneficiary(ctx, vestingID, beneficiaries[i], amounts[i])
@@ -124,7 +124,7 @@ func (s *SmartContract) AddBeneficiaries(ctx kalpsdk.TransactionContextInterface
 
 	vestingTotalSupply, ok := new(big.Int).SetString(vestingPeriod.TotalSupply, 10)
 	if !ok {
-		return InvalidAmountError("vestingTotalSupply", vestingID, vestingPeriod.TotalSupply)
+		return ErrInvalidAmount("vestingTotalSupply", vestingID, vestingPeriod.TotalSupply)
 	}
 
 	if vestingTotalSupply.Cmp(totalAllocations) < 0 {
@@ -150,12 +150,12 @@ func (s *SmartContract) SetGiniToken(ctx kalpsdk.TransactionContextInterface, to
 		return ErrInvalidContractAddress(tokenAddress)
 	}
 
-	tokenAddress, err := GetGiniTokenAddressForSetToken(ctx)
+	address, err := GetGiniTokenAddressForSetToken(ctx)
 	if err != nil {
 		return err
 	}
 
-	if len(tokenAddress) != 0 {
+	if len(address) != 0 {
 		return ErrTokenAlreadySet
 	}
 
@@ -282,7 +282,7 @@ func (s *SmartContract) ClaimAll(ctx kalpsdk.TransactionContextInterface, benefi
 
 		amountToClaimInInt, ok := new(big.Int).SetString(amountToClaim, 10)
 		if !ok {
-			return InvalidAmountError("vestingID", vestingID, amountToClaim)
+			return ErrInvalidAmount("vestingID", vestingID, amountToClaim)
 		}
 
 		if amountToClaimInInt.Cmp(big.NewInt(0)) == 0 {
@@ -340,8 +340,9 @@ func (s *SmartContract) ClaimAll(ctx kalpsdk.TransactionContextInterface, benefi
 	output := ctx.InvokeChaincode(giniContract, [][]byte{[]byte(giniTransfer), []byte(signer), []byte(totalClaimAmount.String())}, Channel)
 
 	b, _ := strconv.ParseBool(string(output.Payload))
+
 	if !b {
-		return NewCustomError(http.StatusInternalServerError, "unable to transfer token", err)
+		return NewCustomError(int(output.Status), fmt.Sprintf("unable to transfer token: %s", output.Message), nil)
 	}
 
 	return nil
@@ -370,7 +371,7 @@ func (s *SmartContract) GetClaimsAmountForAllVestings(ctx kalpsdk.TransactionCon
 
 		amountInInt, ok := new(big.Int).SetString(claimAmount, 10)
 		if !ok {
-			return nil, InvalidAmountError("vestingID", vestingID, claimAmount)
+			return nil, ErrInvalidAmount("vestingID", vestingID, claimAmount)
 		}
 
 		totalAmount.Add(totalAmount, amountInInt)
@@ -528,14 +529,14 @@ func (s *SmartContract) Claim(ctx kalpsdk.TransactionContextInterface, vestingID
 
 	amountToClaimInInt, ok := new(big.Int).SetString(amountToClaim, 10)
 	if !ok {
-		return InvalidAmountError("vestingID", vestingID, amountToClaim)
+		return ErrInvalidAmount("vestingID", vestingID, amountToClaim)
 	}
 
 	if amountToClaimInInt.Cmp(big.NewInt(0)) == 0 {
 		timeStamp, _ := ctx.GetTxTimestamp()
 
 		if vestingPeriod.StartTimestamp > uint64(timeStamp.Seconds) {
-			return OnlyAfterVestingStart(vestingID)
+			return ErrOnlyAfterVestingStart(vestingID)
 		} else {
 			return ErrNothingToClaim
 		}
@@ -584,10 +585,10 @@ func (s *SmartContract) Claim(ctx kalpsdk.TransactionContextInterface, vestingID
 	// Simulate transfer of tokens (in a real system, you would interact with a token contract or handle appropriately)
 	output := ctx.InvokeChaincode(giniContract, [][]byte{[]byte(giniTransfer), []byte(signer), []byte(amountToClaim)}, Channel)
 
-	fmt.Println("output of gini chaincode", output)
 	b, _ := strconv.ParseBool(string(output.Payload))
+
 	if !b {
-		return NewCustomError(http.StatusInternalServerError, "unable to transfer token", err)
+		return NewCustomError(int(output.Status), fmt.Sprintf("unable to transfer token: %s", output.Message), nil)
 	}
 
 	return nil

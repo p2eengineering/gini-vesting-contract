@@ -21,11 +21,11 @@ type CustomError struct {
 	Err     error
 }
 
-func InvalidAmountError(entity, value, amount string) error {
+func ErrInvalidAmount(entity, value, amount string) error {
 	return fmt.Errorf("invalid amount format for %s with value %s", entity, value)
 }
 
-func OnlyAfterVestingStart(vestingID string) error {
+func ErrOnlyAfterVestingStart(vestingID string) error {
 	return fmt.Errorf("vesting has not started yet for vesting ID %s", vestingID)
 }
 
@@ -34,7 +34,7 @@ func ErrInvalidContractAddress(contractAddress string) error {
 }
 
 func ErrArraysLengthMismatch(length1, length2 int) error {
-	return fmt.Errorf("beneficiaries and amounts arrays length mismatch, beneficiaries arr length: %d, amounts arr length: %d", length1, length2)
+	return fmt.Errorf("ArraysLengthMismatch: length1: %d, length2: %d", length1, length2)
 }
 
 func ErrTotalSupplyReached(vestingID string) error {
@@ -51,7 +51,7 @@ func ErrBeneficiaryAlreadyExists(beneficiary string) error {
 
 func ErrClaimAmountExceedsVestingAmount(vestingID, beneficiaryAddress, claimAmount, beneficiaryTotalAllocations string) error {
 	return fmt.Errorf("claim amount exceeds vesting amount for vesting ID %s and beneficiary %s: claimAmount=%d, totalAllocations=%d",
-	vestingID, beneficiaryAddress, claimAmount, beneficiaryTotalAllocations)
+		vestingID, beneficiaryAddress, claimAmount, beneficiaryTotalAllocations)
 }
 
 func (e *CustomError) Error() string {

@@ -43,7 +43,7 @@ func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 
 	amountInInt, ok := new(big.Int).SetString(amount, 10)
 	if !ok {
-		return InvalidAmountError("beneficiary", beneficiary, amount)
+		return ErrInvalidAmount("beneficiary", beneficiary, amount)
 	}
 
 	// Ensure amount is not zero
@@ -123,8 +123,8 @@ func calcClaimableAmount(
 	elapsed := big.NewInt(int64(elapsedIntervals))
 	durationBig := big.NewInt(int64(duration))
 	durationBig.Div(durationBig, big.NewInt(claimInterval))
-	claimable := new(big.Int).Mul(allocationsAfterUnlock, elapsed)
-	claimable.Div(claimable, durationBig)
+	claimable := new(big.Int).Div(allocationsAfterUnlock, durationBig)
+	claimable.Mul(claimable, elapsed)
 
 	return claimable
 }

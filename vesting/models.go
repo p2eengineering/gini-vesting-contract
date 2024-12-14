@@ -177,15 +177,13 @@ func GetTotalClaimsForAll(ctx kalpsdk.TransactionContextInterface) (*big.Int, er
 	if err != nil {
 		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get total claims with Key %s", totalClaimsKey), err)
 	}
-	if totalClaimsAsBytes == nil {
-		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("total claims with Key %s does not exist", totalClaimsKey), nil)
-	}
 
-	// Convert the byte data to big.Int
-	totalClaims := new(big.Int)
-	err = totalClaims.UnmarshalText(totalClaimsAsBytes)
-	if err != nil {
-		return nil, NewCustomError(http.StatusInternalServerError, "failed to unmarshal total claims", err)
+	totalClaims := big.NewInt(0)
+	if totalClaimsAsBytes != nil {
+		_, success := totalClaims.SetString(string(totalClaimsAsBytes), 10)
+		if !success {
+			return nil, NewCustomError(http.StatusInternalServerError, "failed to parse claimed amount for all", nil)
+		}
 	}
 
 	return totalClaims, nil
@@ -217,10 +215,12 @@ func GetTotalClaims(ctx kalpsdk.TransactionContextInterface, vestingID string) (
 		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get total claims with Key %s", totalClaimsKey), err)
 	}
 
-	totalClaims := new(big.Int)
-	err = totalClaims.UnmarshalText(totalClaimsAsBytes)
-	if err != nil {
-		return nil, NewCustomError(http.StatusInternalServerError, "failed to unmarshal total claims", err)
+	totalClaims := big.NewInt(0)
+	if totalClaimsAsBytes != nil {
+		_, success := totalClaims.SetString(string(totalClaimsAsBytes), 10)
+		if !success {
+			return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to parse claimed amount for vesting ID %s", vestingID), nil)
+		}
 	}
 
 	return totalClaims, nil
