@@ -6,8 +6,9 @@ import (
 
 	"github.com/p2eengineering/kalp-sdk-public/kalpsdk"
 )
+
 type VestingPeriodEvent struct {
-	VestingID           string `json:"vestingId"`
+	VestingID           string `json:"vestingID"`
 	TotalSupply         string `json:"totalSupply"`
 	CliffStartTimestamp uint64 `json:"cliffStartTimestamp"`
 	StartTimestamp      uint64 `json:"startTimestamp"`
@@ -16,13 +17,13 @@ type VestingPeriodEvent struct {
 }
 
 type BeneficiariesAddedEvent struct {
-	VestingID        string `json:"vestingId"`
+	VestingID        string `json:"vestingID"`
 	TotalAllocations string `json:"totalAllocations"`
 }
 
 type ClaimEvent struct {
 	User      string `json:"user"`
-	VestingID string `json:"vestingId"`
+	VestingID string `json:"vestingID"`
 	Amount    string `json:"amount"`
 }
 
@@ -85,7 +86,7 @@ func EmitSetGiniToken(ctx kalpsdk.TransactionContextInterface, tokenAddress stri
 		return fmt.Errorf("failed to marshal event data: %v", err)
 	}
 
-	err = ctx.SetEvent("giniTokenEvent", eventBytes)
+	err = ctx.SetEvent(giniTokenEvent, eventBytes)
 	if err != nil {
 		return fmt.Errorf("failed to emit SetGiniToken event: %v", err)
 	}

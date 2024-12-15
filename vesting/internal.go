@@ -55,7 +55,7 @@ func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 
 	beneficiaryJSON, err := ctx.GetState(fmt.Sprintf("beneficiaries_%s_%s", vestingID, beneficiary))
 	if err != nil {
-		return fmt.Errorf("failed to get Beneficiary struct for vestingId : %s and beneficiary: %s, %v", vestingID, beneficiary, err)
+		return fmt.Errorf("failed to get Beneficiary struct for vestingID : %s and beneficiary: %s, %v", vestingID, beneficiary, err)
 	}
 
 	if beneficiaryJSON != nil {
@@ -132,6 +132,9 @@ func calcClaimableAmount(
 }
 
 func TransferGiniTokens(ctx kalpsdk.TransactionContextInterface, signer, totalClaimAmount string) error {
+	logger := kalpsdk.NewLogger()
+	logger.Infoln("TransferGiniTokens called.... with arguments ", signer, totalClaimAmount)
+
 	giniContract, err := GetGiniTokenAddress(ctx)
 	if err != nil {
 		return err
@@ -142,10 +145,13 @@ func TransferGiniTokens(ctx kalpsdk.TransactionContextInterface, signer, totalCl
 	}
 
 	channel := ctx.GetChannelID()
+	if channel == "" {
+		return NewCustomError(http.StatusInternalServerError, "unable to get the channel name", nil)
+	}
 
 	// TODO: check this on stagenet also
 	// Simulate transfer of tokens (in a real system, you would interact with a token contract or handle appropriately)
-	output := ctx.InvokeChaincode(giniContract, [][]byte{[]byte("giniTransfer"), []byte(signer), []byte(totalClaimAmount)}, channel)
+	output := ctx.InvokeChaincode(giniContract, [][]byte{[]byte(giniTransfer), []byte(signer), []byte(totalClaimAmount)}, channel)
 
 	b, _ := strconv.ParseBool(string(output.Payload))
 
