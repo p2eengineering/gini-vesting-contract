@@ -6,14 +6,15 @@ import (
 )
 
 var (
-	ErrNoBeneficiaries          = errors.New("no beneficiaries provided")
-	ErrArraysLengthMismatch     = errors.New("beneficiaries and amounts arrays length mismatch")
-	ErrTotalSupplyReached       = errors.New("total supply reached for vesting type")
-	ErrZeroVestingAmount        = errors.New("vesting amount cannot be zero")
-	ErrBeneficiaryAlreadyExists = errors.New("beneficiary already exists")
-	ErrCannotBeZero             = errors.New("startTimestamp cannot be zero")
-	ErrInvalidUserAddress       = errors.New("beneficiary address cannot be zero")
-	ErrNonPositiveVestingAmount = errors.New("vesting amount cannot be less than or equal to zero")
+	ErrNoBeneficiaries                    = errors.New("NoBeneficiaries")
+	ErrCannotBeZero                       = errors.New("CannotBeZero")
+	ErrContractAddressAlreadySet          = errors.New("ContractAddressAlreadySet")
+	ErrNonPositiveVestingAmount           = errors.New("NonPositiveVestingAmount")
+	ErrNothingToClaim                     = errors.New("NothingToClaim")
+	ErrTokenAlreadySet                    = errors.New("TokenAlreadySet")
+	ErrDurationCannotBeZeroForClaimAmount = errors.New("DurationCannotBeZero")
+	ErrTotalAllocationCannotBeNonPositive = errors.New("TotalAllocationCannotBeNonPositive")
+	ErrInitialUnlockCannotBeNegative      = errors.New("InitialUnlockCannotBeNegative")
 )
 
 type CustomError struct {
@@ -22,8 +23,58 @@ type CustomError struct {
 	Err     error
 }
 
-func InvalidAmountError(entity, value, amount string) error {
-	return fmt.Errorf("invalid amount format for %s with value %s", entity, value)
+
+func ErrInvalidUserAddress(userAddress string) error {
+	return fmt.Errorf("InvalidUserAddress for userAddress %s", userAddress)
+}
+
+func ErrDurationCannotBeZero(vestingID string) error {
+	return fmt.Errorf("DurationCannotBeZero for vestingID %s", vestingID)
+}
+
+func ErrTotalSupplyCannotBeNonPositive(vestingID string) error {
+	return fmt.Errorf("TotalSupplyCannotBeNonPositive for vestingID %s", vestingID)
+}
+
+func ErrInvalidAmount(entity, value, amount string) error {
+	return fmt.Errorf("InvalidAmount for %s with value %s for amount %s", entity, value, amount)
+}
+
+func ErrOnlyAfterVestingStart(vestingID string) error {
+	return fmt.Errorf("OnlyAfterVestingStart for vesting ID %s", vestingID)
+}
+
+func ErrInvalidContractAddress(contractAddress string) error {
+	return fmt.Errorf("InvalidContractAddress for address %s", contractAddress)
+}
+
+func ErrArraysLengthMismatch(length1, length2 int) error {
+	return fmt.Errorf("ArraysLengthMismatch: length1: %d, length2: %d", length1, length2)
+}
+
+func ErrTotalSupplyReached(vestingID string) error {
+	return fmt.Errorf("TotalSupplyReached for vesting type: %s", vestingID)
+}
+
+func ErrZeroVestingAmount(beneficiary string) error {
+	return fmt.Errorf("ZeroVestingAmount for beneficiary: %s", beneficiary)
+}
+
+func ErrBeneficiaryAlreadyExists(beneficiary string) error {
+	return fmt.Errorf("BeneficiaryAlreadyExists for beneficiary: %s", beneficiary)
+}
+
+func ErrUserVestingsAlreadyExists(beneficiary string) error {
+	return fmt.Errorf("UserVestingsAlreadyExists for beneficiary: %s", beneficiary)
+}
+
+func ErrClaimAmountExceedsVestingAmount(vestingID, beneficiaryAddress, claimAmount, beneficiaryTotalAllocations string) error {
+	return fmt.Errorf("ClaimAmountExceedsVestingAmount for vesting ID %s and beneficiary %s: claimAmount=%d, totalAllocations=%d",
+		vestingID, beneficiaryAddress, claimAmount, beneficiaryTotalAllocations)
+}
+
+func ErrInvalidVestingID(vestingID string) error {
+	return fmt.Errorf("InvalidVestingID for vestingID: %s", vestingID)
 }
 
 func (e *CustomError) Error() string {

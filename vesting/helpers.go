@@ -4,14 +4,15 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math/big"
+	"net/http"
 	"regexp"
 	"strings"
 
 	"github.com/p2eengineering/kalp-sdk-public/kalpsdk"
 )
 
-func GetUserId(sdk kalpsdk.TransactionContextInterface) (string, error) {
-	b64ID, err := sdk.GetClientIdentity().GetID()
+func GetUserId(ctx kalpsdk.TransactionContextInterface) (string, error) {
+	b64ID, err := ctx.GetClientIdentity().GetID()
 	if err != nil {
 		return "", fmt.Errorf("failed to read clientID: %v", err)
 	}
@@ -23,6 +24,11 @@ func GetUserId(sdk kalpsdk.TransactionContextInterface) (string, error) {
 
 	completeId := string(decodeID)
 	userId := completeId[(strings.Index(completeId, "x509::CN=") + 9):strings.Index(completeId, ",")]
+
+	if !IsUserAddressValid(userId) {
+		return "", ErrInvalidUserAddress(userId)
+	}
+
 	return userId, nil
 }
 
@@ -67,4 +73,37 @@ func ConvertGiniToWei(giniAmount uint64) string {
 
 	// Convert weiAmount to string and return
 	return weiAmount.String()
+}
+
+func IsSignerKalpFoundation(ctx kalpsdk.TransactionContextInterface) error {
+	signer, err := GetUserId(ctx)
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, "failed to get client id", err)
+	}
+
+	if signer != kalpFoundation {
+		return NewCustomError(http.StatusBadRequest, "signer is not kalp foundation", err)
+	}
+
+	return nil
+}
+
+func isValidVestingID(vestingID string) bool {
+	validVestingIDs := map[string]bool{
+		"Team":             true,
+		"Foundation":       true,
+		"AngelRound":       true,
+		"SeedRound":        true,
+		"PrivateRound1":    true,
+		"PrivateRound2":    true,
+		"Advisors":         true,
+		"KOLRound":         true,
+		"Marketing":        true,
+		"StakingRewards":   true,
+		"EcosystemReserve": true,
+		"Airdrop":          true,
+		"LiquidityPool":    true,
+		"PublicAllocation": true,
+	}
+	return validVestingIDs[vestingID]
 }
