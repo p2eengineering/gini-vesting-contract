@@ -143,7 +143,7 @@ func calcClaimableAmount(
 		return big.NewInt(0), ErrTotalAllocationCannotBeNonPositive
 	}
 
-	if initialUnlock.Cmp(big.NewInt(0)) <= 0 {
+	if initialUnlock.Cmp(big.NewInt(0)) < 0 {
 		return big.NewInt(0), ErrInitialUnlockCannotBeNegative
 	}
 
