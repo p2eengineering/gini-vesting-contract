@@ -198,7 +198,7 @@ func (s *SmartContract) CalculateClaimAmount(ctx kalpsdk.TransactionContextInter
 	}
 
 	if !IsUserAddressValid(beneficiaryAddress) {
-		return "0", ErrInvalidUserAddress
+		return "0", ErrInvalidUserAddress(beneficiaryAddress)
 	}
 
 	beneficiary, err := GetBeneficiary(ctx, vestingID, beneficiaryAddress)
@@ -232,16 +232,22 @@ func (s *SmartContract) CalculateClaimAmount(ctx kalpsdk.TransactionContextInter
 		return "0", nil
 	}
 
-	initialUnlock := calcInitialUnlock(beneficiaryTotalAllocations, vestingPeriod.TGE)
+	initialUnlock, err := calcInitialUnlock(beneficiaryTotalAllocations, vestingPeriod.TGE)
+	if err != nil {
+		return "0", err
+	}
 
 	// Calculate claimable amount
-	claimableAmount := calcClaimableAmount(
+	claimableAmount, err := calcClaimableAmount(
 		uint64(currentTime.Seconds),
 		beneficiaryTotalAllocations,
 		vestingPeriod.StartTimestamp,
 		vestingPeriod.Duration,
 		initialUnlock,
 	)
+	if err != nil {
+		return "0", err
+	}
 
 	claimAmount := new(big.Int)
 	claimAmount.Add(claimableAmount, initialUnlock)
@@ -290,7 +296,7 @@ func (s *SmartContract) ClaimAll(ctx kalpsdk.TransactionContextInterface, benefi
 	logger.Infoln("GetVestingData Invoked.... with arguments ", beneficiary)
 
 	if !IsUserAddressValid(beneficiary) {
-		return ErrInvalidUserAddress
+		return ErrInvalidUserAddress(beneficiary)
 	}
 
 	signer, err := GetUserId(ctx)
@@ -377,7 +383,7 @@ func (s *SmartContract) GetClaimsAmountForAllVestings(ctx kalpsdk.TransactionCon
 	logger.Infoln("GetClaimsAmountForAllVestings Invoked.... with arguments ", beneficiary)
 
 	if !IsUserAddressValid(beneficiary) {
-		return nil, ErrInvalidUserAddress
+		return nil, ErrInvalidUserAddress(beneficiary)
 	}
 
 	totalAmount := big.NewInt(0)
@@ -420,7 +426,7 @@ func (s *SmartContract) GetVestingsDuration(ctx kalpsdk.TransactionContextInterf
 	logger.Infoln("GetVestingsDuration Invoked.... with input arguments ", beneficiary)
 
 	if !IsUserAddressValid(beneficiary) {
-		return nil, ErrInvalidUserAddress
+		return nil, ErrInvalidUserAddress(beneficiary)
 	}
 
 	userVestingList, err := GetUserVesting(ctx, beneficiary)
@@ -453,7 +459,7 @@ func (s *SmartContract) GetAllocationsForAllVestings(ctx kalpsdk.TransactionCont
 	logger.Infoln("GetAllocationsForAllVestings Invoked.... with input arguments ", beneficiary)
 
 	if !IsUserAddressValid(beneficiary) {
-		return nil, ErrInvalidUserAddress
+		return nil, ErrInvalidUserAddress(beneficiary)
 	}
 
 	userVestingList, err := GetUserVesting(ctx, beneficiary)
@@ -485,7 +491,7 @@ func (s *SmartContract) GetUserVestings(ctx kalpsdk.TransactionContextInterface,
 	logger.Infoln("GetUserVestings Invoked.... with arguments ", beneficiary)
 
 	if !IsUserAddressValid(beneficiary) {
-		return nil, ErrInvalidUserAddress
+		return nil, ErrInvalidUserAddress(beneficiary)
 	}
 
 	userVestingList, err := GetUserVesting(ctx, beneficiary)
@@ -506,7 +512,7 @@ func (s *SmartContract) GetTotalClaims(ctx kalpsdk.TransactionContextInterface, 
 	logger.Infoln("GetTotalClaims Invoked.... with arguments ", beneficiary)
 
 	if !IsUserAddressValid(beneficiary) {
-		return nil, ErrInvalidUserAddress
+		return nil, ErrInvalidUserAddress(beneficiary)
 	}
 
 	userVestingList, err := GetUserVesting(ctx, beneficiary)

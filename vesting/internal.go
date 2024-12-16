@@ -18,6 +18,27 @@ func validateNSetVesting(
 	totalSupply string,
 	tge uint64,
 ) error {
+	if !isValidVestingID(vestingID) {
+		return ErrInvalidVestingID(vestingID)
+	}
+
+	if startTimestamp == 0 {
+		return ErrCannotBeZero
+	}
+
+	if duration == 0 {
+		return ErrDurationCannotBeZero(vestingID)
+	}
+
+	totalSupplyInInt, ok := new(big.Int).SetString(totalSupply, 10)
+	if !ok {
+		return ErrInvalidAmount("vestingID", vestingID, totalSupply)
+	}
+
+	if totalSupplyInInt.Cmp(big.NewInt(0)) <= 0 {
+		return ErrTotalSupplyCannotBeNonPositive(vestingID)
+	}
+
 	vestingPeriod := &VestingPeriod{
 		TotalSupply:         totalSupply,
 		CliffStartTimestamp: startTimestamp,
@@ -40,7 +61,7 @@ func validateNSetVesting(
 
 func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, beneficiary, amount string) error {
 	if !IsUserAddressValid(beneficiary) {
-		return ErrInvalidUserAddress
+		return ErrInvalidUserAddress(beneficiary)
 	}
 
 	amountInInt, ok := new(big.Int).SetString(amount, 10)
@@ -82,16 +103,20 @@ func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 	return nil
 }
 
-func calcInitialUnlock(totalAllocations *big.Int, initialUnlockPercentage uint64) *big.Int {
+func calcInitialUnlock(totalAllocations *big.Int, initialUnlockPercentage uint64) (*big.Int, error) {
+
+	if totalAllocations.Cmp(big.NewInt(0)) <= 0 {
+		return big.NewInt(0), ErrTotalAllocationCannotBeNonPositive
+	}
 
 	if initialUnlockPercentage == 0 {
-		return big.NewInt(0)
+		return big.NewInt(0), nil
 	}
 
 	percentage := big.NewInt(int64(initialUnlockPercentage))
 
 	result := new(big.Int).Mul(totalAllocations, percentage)
-	return result.Div(result, big.NewInt(100))
+	return result.Div(result, big.NewInt(100)), nil
 }
 
 func calcClaimableAmount(
@@ -100,23 +125,43 @@ func calcClaimableAmount(
 	startTimestamp,
 	duration uint64,
 	initialUnlock *big.Int,
-) *big.Int {
+) (*big.Int, error) {
+
+	if timestamp == 0 {
+		return big.NewInt(0), ErrCannotBeZero
+	}
+
+	if startTimestamp == 0 {
+		return big.NewInt(0), ErrCannotBeZero
+	}
+
+	if duration == 0 {
+		return big.NewInt(0), ErrDurationCannotBeZeroForClaimAmount
+	}
+
+	if totalAllocations.Cmp(big.NewInt(0)) <= 0 {
+		return big.NewInt(0), ErrTotalAllocationCannotBeNonPositive
+	}
+
+	if initialUnlock.Cmp(big.NewInt(0)) <= 0 {
+		return big.NewInt(0), ErrInitialUnlockCannotBeNegative
+	}
 
 	if timestamp < startTimestamp {
-		return big.NewInt(0)
+		return big.NewInt(0), nil
 	}
 
 	elapsedIntervals := (timestamp - startTimestamp) / claimInterval
 
 	if elapsedIntervals == 0 {
-		return big.NewInt(0)
+		return big.NewInt(0), nil
 	}
 
 	// If the timestamp is beyond the total duration, return the remaining amount
 	endTimestamp := startTimestamp + duration
 
 	if timestamp > endTimestamp {
-		return new(big.Int).Sub(totalAllocations, initialUnlock)
+		return new(big.Int).Sub(totalAllocations, initialUnlock), nil
 	}
 
 	// Calculate claimable amount
@@ -128,7 +173,7 @@ func calcClaimableAmount(
 	claimable := new(big.Int).Div(allocationsAfterUnlock, durationBig)
 	claimable.Mul(claimable, elapsed)
 
-	return claimable
+	return claimable, nil
 }
 
 func TransferGiniTokens(ctx kalpsdk.TransactionContextInterface, signer, totalClaimAmount string) error {

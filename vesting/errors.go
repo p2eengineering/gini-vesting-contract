@@ -6,13 +6,15 @@ import (
 )
 
 var (
-	ErrNoBeneficiaries           = errors.New("NoBeneficiaries")
-	ErrCannotBeZero              = errors.New("CannotBeZero")
-	ErrInvalidUserAddress        = errors.New("InvalidUserAddress")
-	ErrContractAddressAlreadySet = errors.New("ContractAddressAlreadySet")
-	ErrNonPositiveVestingAmount  = errors.New("NonPositiveVestingAmount")
-	ErrNothingToClaim            = errors.New("NothingToClaim")
-	ErrTokenAlreadySet           = errors.New("TokenAlreadySet")
+	ErrNoBeneficiaries                    = errors.New("NoBeneficiaries")
+	ErrCannotBeZero                       = errors.New("CannotBeZero")
+	ErrContractAddressAlreadySet          = errors.New("ContractAddressAlreadySet")
+	ErrNonPositiveVestingAmount           = errors.New("NonPositiveVestingAmount")
+	ErrNothingToClaim                     = errors.New("NothingToClaim")
+	ErrTokenAlreadySet                    = errors.New("TokenAlreadySet")
+	ErrDurationCannotBeZeroForClaimAmount = errors.New("DurationCannotBeZero")
+	ErrTotalAllocationCannotBeNonPositive = errors.New("TotalAllocationCannotBeNonPositive")
+	ErrInitialUnlockCannotBeNegative      = errors.New("InitialUnlockCannotBeNegative")
 )
 
 type CustomError struct {
@@ -21,8 +23,21 @@ type CustomError struct {
 	Err     error
 }
 
+
+func ErrInvalidUserAddress(userAddress string) error {
+	return fmt.Errorf("InvalidUserAddress for userAddress %s", userAddress)
+}
+
+func ErrDurationCannotBeZero(vestingID string) error {
+	return fmt.Errorf("DurationCannotBeZero for vestingID %s", vestingID)
+}
+
+func ErrTotalSupplyCannotBeNonPositive(vestingID string) error {
+	return fmt.Errorf("TotalSupplyCannotBeNonPositive for vestingID %s", vestingID)
+}
+
 func ErrInvalidAmount(entity, value, amount string) error {
-	return fmt.Errorf("InvalidAmount for %s with value %s", entity, value)
+	return fmt.Errorf("InvalidAmount for %s with value %s for amount %s", entity, value, amount)
 }
 
 func ErrOnlyAfterVestingStart(vestingID string) error {
@@ -46,11 +61,11 @@ func ErrZeroVestingAmount(beneficiary string) error {
 }
 
 func ErrBeneficiaryAlreadyExists(beneficiary string) error {
-	return fmt.Errorf("BeneficiaryAlreadyExists: %s", beneficiary)
+	return fmt.Errorf("BeneficiaryAlreadyExists for beneficiary: %s", beneficiary)
 }
 
 func ErrUserVestingsAlreadyExists(beneficiary string) error {
-	return fmt.Errorf("UserVestingsAlreadyExists: %s", beneficiary)
+	return fmt.Errorf("UserVestingsAlreadyExists for beneficiary: %s", beneficiary)
 }
 
 func ErrClaimAmountExceedsVestingAmount(vestingID, beneficiaryAddress, claimAmount, beneficiaryTotalAllocations string) error {

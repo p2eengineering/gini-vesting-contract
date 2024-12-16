@@ -24,6 +24,11 @@ func GetUserId(ctx kalpsdk.TransactionContextInterface) (string, error) {
 
 	completeId := string(decodeID)
 	userId := completeId[(strings.Index(completeId, "x509::CN=") + 9):strings.Index(completeId, ",")]
+
+	if !IsUserAddressValid(userId) {
+		return "", ErrInvalidUserAddress(userId)
+	}
+
 	return userId, nil
 }
 
