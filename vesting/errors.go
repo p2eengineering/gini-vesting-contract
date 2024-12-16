@@ -49,6 +49,10 @@ func ErrBeneficiaryAlreadyExists(beneficiary string) error {
 	return fmt.Errorf("BeneficiaryAlreadyExists: %s", beneficiary)
 }
 
+func ErrUserVestingsAlreadyExists(beneficiary string) error {
+	return fmt.Errorf("UserVestingsAlreadyExists: %s", beneficiary)
+}
+
 func ErrClaimAmountExceedsVestingAmount(vestingID, beneficiaryAddress, claimAmount, beneficiaryTotalAllocations string) error {
 	return fmt.Errorf("ClaimAmountExceedsVestingAmount for vesting ID %s and beneficiary %s: claimAmount=%d, totalAllocations=%d",
 		vestingID, beneficiaryAddress, claimAmount, beneficiaryTotalAllocations)

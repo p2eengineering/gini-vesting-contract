@@ -24,13 +24,25 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 		return err
 	}
 
+	kalpFoundationBeneficiaryKey := kalpFoundationBeneficiaryKeyPrefix + kalpFoundation
+	kalpFoundationUserVestingKey := kalpFoundationUserVestingKeyPrefix + kalpFoundation
+
 	beneficiaryJSON, err := ctx.GetState(kalpFoundationBeneficiaryKey)
 	if err != nil {
-		return fmt.Errorf("failed to get Beneficiary struct for %s, %v", kalpFoundationBeneficiaryKey, err)
+		return fmt.Errorf("failed to get Beneficiary struct for %s, %v", kalpFoundation, err)
 	}
 
 	if beneficiaryJSON != nil {
-		return fmt.Errorf("Contract is already initialised as %w: %s", ErrBeneficiaryAlreadyExists(kalpFoundationBeneficiaryKey))
+		return fmt.Errorf("Contract is already initialised as %w: %s", ErrBeneficiaryAlreadyExists(kalpFoundation))
+	}
+
+	userVestingJSON, err := ctx.GetState(kalpFoundationUserVestingKey)
+	if err != nil {
+		return fmt.Errorf("failed to get User vesting struct for %s, %v", kalpFoundation, err)
+	}
+
+	if userVestingJSON != nil {
+		return fmt.Errorf("Contract is already initialised as %w: %s", ErrUserVestingsAlreadyExists(kalpFoundation))
 	}
 
 	// Initialize different vesting periods
@@ -49,7 +61,7 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 	validateNSetVesting(ctx, LiquidityPool.String(), 0, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(200000000), 25)
 	validateNSetVesting(ctx, PublicAllocation.String(), 30*3*24*60*60, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(60000000), 25)
 
-	// validateNSetVesting(ctx, Team.String(), 2*60, startTimestamp, 12*60, ConvertGiniToWei(300000000), 0)
+	// validateNSetVesting(ctx, Team.String(), 4*60, startTimestamp, 12*60, ConvertGiniToWei(300000000), 0)
 	// validateNSetVesting(ctx, Foundation.String(), 0, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(220000000), 0)
 	// validateNSetVesting(ctx, AngelRound.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(20000000), 0)
 	// validateNSetVesting(ctx, SeedRound.String(), 30*10*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(40000000), 0)
@@ -57,14 +69,14 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 	// validateNSetVesting(ctx, PrivateRound2.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(60000000), 0)
 	// validateNSetVesting(ctx, Advisors.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(30000000), 0)
 	// validateNSetVesting(ctx, KOLRound.String(), 30*3*24*60*60, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(30000000), 25)
-	// validateNSetVesting(ctx, Marketing.String(), 2*60, startTimestamp, 12*60, ConvertGiniToWei(80000000), 10)
+	// validateNSetVesting(ctx, Marketing.String(), 6*60, startTimestamp, 18*60, ConvertGiniToWei(80000000), 10)
 	// validateNSetVesting(ctx, StakingRewards.String(), 30*3*24*60*60, startTimestamp, 30*24*24*60*60, ConvertGiniToWei(180000000), 0)
 	// validateNSetVesting(ctx, EcosystemReserve.String(), 0, startTimestamp, 12*60, ConvertGiniToWei(560000000), 2)
 	// validateNSetVesting(ctx, Airdrop.String(), 30*6*24*60*60, startTimestamp, 30*9*24*60*60, ConvertGiniToWei(80000000), 10)
 	// validateNSetVesting(ctx, LiquidityPool.String(), 0, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(200000000), 25)
 	// validateNSetVesting(ctx, PublicAllocation.String(), 30*3*24*60*60, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(60000000), 25)
 
-	err = SetBeneficiary(ctx, EcosystemReserve.String(), kalpFoundationKey, &Beneficiary{
+	err = SetBeneficiary(ctx, EcosystemReserve.String(), kalpFoundation, &Beneficiary{
 		TotalAllocations: kalpFoundationTotalAllocations,
 		ClaimedAmount:    kalpFoundationClaimedAmount,
 	})
@@ -77,7 +89,7 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 	EmitClaim(ctx, kalpFoundation, EcosystemReserve.String(), kalpFoundationClaimedAmount)
 
 	userVestingList := UserVestings{EcosystemReserve.String()}
-	err = SetUserVesting(ctx, kalpFoundationUserVestingKey, userVestingList)
+	err = SetUserVesting(ctx, kalpFoundation, userVestingList)
 	if err != nil {
 		return NewCustomError(http.StatusInternalServerError, "failed to set user vestings", err)
 	}
@@ -85,9 +97,9 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 	return nil
 }
 
-// TODO: Need to ask if we have to accept VestingId as an int format 
-// or the current string format is fine , even if it is string 
-// format, we have to convert it to lower case character before 
+// TODO: Need to ask if we have to accept VestingId as an int format
+// or the current string format is fine , even if it is string
+// format, we have to convert it to lower case character before
 // using it anywhere
 
 func (s *SmartContract) AddBeneficiaries(ctx kalpsdk.TransactionContextInterface, vestingID string, beneficiaries []string, amounts []string) error {

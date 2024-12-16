@@ -128,7 +128,7 @@ func SetVestingPeriod(ctx kalpsdk.TransactionContextInterface, vestingID string,
 }
 
 func GetUserVesting(ctx kalpsdk.TransactionContextInterface, beneficiaryID string) (UserVestings, error) {
-	userVestingKey := fmt.Sprintf("uservesting_%s", beneficiaryID)
+	userVestingKey := fmt.Sprintf("uservestings_%s", beneficiaryID)
 	userVestingJSON, err := ctx.GetState(userVestingKey)
 	if err != nil {
 		return nil, NewCustomError(http.StatusNotFound, fmt.Sprintf("Failed to get user vestings for %s", userVestingKey), err)
@@ -156,7 +156,7 @@ func SetUserVesting(ctx kalpsdk.TransactionContextInterface, beneficiaryID strin
 	}
 
 	// Generate the key to store user vesting in the state
-	userVestingKey := fmt.Sprintf("uservesting_%s", beneficiaryID)
+	userVestingKey := fmt.Sprintf("uservestings_%s", beneficiaryID)
 
 	// Store the updated vesting list on the blockchain ledger
 	err = ctx.PutStateWithoutKYC(userVestingKey, updatedUserVestingJSON)
