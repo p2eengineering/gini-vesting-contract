@@ -53,7 +53,6 @@ func validateNSetVesting(
 		return fmt.Errorf("failed to set vestingPeriod: %v", err)
 	}
 
-	// Emit Vesting Initialized event (simulate event using a print statement)
 	EmitVestingInitialized(ctx, vestingID, cliffDuration, startTimestamp, duration, totalSupply, tge)
 
 	return nil
@@ -69,7 +68,6 @@ func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 		return ErrInvalidAmount("beneficiary", beneficiary, amount)
 	}
 
-	// Ensure amount is not zero
 	if amountInInt.Cmp(big.NewInt(0)) <= 0 {
 		return fmt.Errorf("%w: %s", ErrNonPositiveVestingAmount, beneficiary)
 	}
@@ -156,14 +154,12 @@ func calcClaimableAmount(
 		return big.NewInt(0), nil
 	}
 
-	// If the timestamp is beyond the total duration, return the remaining amount
 	endTimestamp := startTimestamp + duration
 
 	if timestamp > endTimestamp {
 		return new(big.Int).Sub(totalAllocations, initialUnlock), nil
 	}
 
-	// Calculate claimable amount
 	allocationsAfterUnlock := new(big.Int).Sub(totalAllocations, initialUnlock)
 
 	elapsed := big.NewInt(int64(elapsedIntervals))

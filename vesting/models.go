@@ -55,7 +55,6 @@ type TotalClaimsWithAllVestings struct {
 	TotalClaims  []string `json:"totalClaims"`
 }
 
-// GetBeneficiary retrieves a Beneficiary by ID
 func GetBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, beneficiaryID string) (*Beneficiary, error) {
 	beneficiaryKey := fmt.Sprintf("beneficiaries_%s_%s", vestingID, beneficiaryID)
 	beneficiaryAsBytes, err := ctx.GetState(beneficiaryKey)
@@ -75,7 +74,6 @@ func GetBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 	return &beneficiary, nil
 }
 
-// SetBeneficiary sets a Beneficiary in the state
 func SetBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, beneficiaryID string, beneficiary *Beneficiary) error {
 	beneficiaryKey := fmt.Sprintf("beneficiaries_%s_%s", vestingID, beneficiaryID)
 	beneficiaryAsBytes, err := json.Marshal(beneficiary)
@@ -91,7 +89,6 @@ func SetBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 	return nil
 }
 
-// GetVestingPeriod retrieves a VestingPeriod by Key
 func GetVestingPeriod(ctx kalpsdk.TransactionContextInterface, vestingID string) (*VestingPeriod, error) {
 	vestingKey := fmt.Sprintf("vestingperiod_%s", vestingID)
 	vestingAsBytes, err := ctx.GetState(vestingKey)
@@ -111,7 +108,6 @@ func GetVestingPeriod(ctx kalpsdk.TransactionContextInterface, vestingID string)
 	return vesting, nil
 }
 
-// SetVestingPeriod sets a VestingPeriod in the state
 func SetVestingPeriod(ctx kalpsdk.TransactionContextInterface, vestingID string, vesting *VestingPeriod) error {
 	vestingKey := fmt.Sprintf("vestingperiod_%s", vestingID)
 	vestingAsBytes, err := json.Marshal(vesting)
@@ -134,12 +130,10 @@ func GetUserVesting(ctx kalpsdk.TransactionContextInterface, beneficiaryID strin
 		return nil, NewCustomError(http.StatusNotFound, fmt.Sprintf("Failed to get user vestings for %s", userVestingKey), err)
 	}
 
-	// If there is no vesting JSON, initialize an empty list
 	if userVestingJSON == nil {
 		return UserVestings{}, nil
 	}
 
-	// Unmarshal the JSON into a slice of strings
 	var userVestingList UserVestings
 	err = json.Unmarshal(userVestingJSON, &userVestingList)
 	if err != nil {
@@ -155,10 +149,8 @@ func SetUserVesting(ctx kalpsdk.TransactionContextInterface, beneficiaryID strin
 		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("Failed to marshal updated user vesting list for %s", beneficiaryID), err)
 	}
 
-	// Generate the key to store user vesting in the state
 	userVestingKey := fmt.Sprintf("uservestings_%s", beneficiaryID)
 
-	// Store the updated vesting list on the blockchain ledger
 	err = ctx.PutStateWithoutKYC(userVestingKey, updatedUserVestingJSON)
 	if err != nil {
 		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("Failed to set updated user vesting list for %s", beneficiaryID), err)
@@ -167,12 +159,9 @@ func SetUserVesting(ctx kalpsdk.TransactionContextInterface, beneficiaryID strin
 	return nil
 }
 
-// GetTotalClaimsForAll retrieves the total claims for all vestings from the state
 func GetTotalClaimsForAll(ctx kalpsdk.TransactionContextInterface) (*big.Int, error) {
-	// Key for total claims for all vestings
 	totalClaimsKey := "total_claims_for_all"
 
-	// Retrieve the state
 	totalClaimsAsBytes, err := ctx.GetState(totalClaimsKey)
 	if err != nil {
 		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get total claims with Key %s", totalClaimsKey), err)
@@ -189,7 +178,6 @@ func GetTotalClaimsForAll(ctx kalpsdk.TransactionContextInterface) (*big.Int, er
 	return totalClaims, nil
 }
 
-// SetTotalClaimsForAll sets the total claims for all vestings in the state
 func SetTotalClaimsForAll(ctx kalpsdk.TransactionContextInterface, totalClaims *big.Int) error {
 	totalClaimsKey := "total_claims_for_all"
 
@@ -206,7 +194,6 @@ func SetTotalClaimsForAll(ctx kalpsdk.TransactionContextInterface, totalClaims *
 	return nil
 }
 
-// GetTotalClaims retrieves the total claims for a specific vesting ID from the state
 func GetTotalClaims(ctx kalpsdk.TransactionContextInterface, vestingID string) (*big.Int, error) {
 	totalClaimsKey := fmt.Sprintf("total_claims_%s", vestingID)
 
@@ -226,7 +213,6 @@ func GetTotalClaims(ctx kalpsdk.TransactionContextInterface, vestingID string) (
 	return totalClaims, nil
 }
 
-// SetTotalClaims sets the total claims for a specific vesting ID in the state
 func SetTotalClaims(ctx kalpsdk.TransactionContextInterface, vestingID string, totalClaims *big.Int) error {
 	totalClaimsKey := fmt.Sprintf("total_claims_%s", vestingID)
 
@@ -243,7 +229,6 @@ func SetTotalClaims(ctx kalpsdk.TransactionContextInterface, vestingID string, t
 	return nil
 }
 
-// GetGiniTokenAddress retrieves the Gini Token address from the blockchain state
 func GetGiniTokenAddress(ctx kalpsdk.TransactionContextInterface) (string, error) {
 	giniTokenAddressBytes, err := ctx.GetState(giniTokenKey)
 	if err != nil {
@@ -253,7 +238,6 @@ func GetGiniTokenAddress(ctx kalpsdk.TransactionContextInterface) (string, error
 	return string(giniTokenAddressBytes), nil
 }
 
-// SetGiniTokenAddress sets the Gini Token address in the blockchain state
 func SetGiniTokenAddress(ctx kalpsdk.TransactionContextInterface, tokenAddress string) error {
 	existingAddress, err := ctx.GetState(giniTokenKey)
 	if err != nil {
@@ -263,7 +247,6 @@ func SetGiniTokenAddress(ctx kalpsdk.TransactionContextInterface, tokenAddress s
 		return NewCustomError(http.StatusConflict, "Gini token address is already set", nil)
 	}
 
-	// Store the new Gini token address in the state
 	err = ctx.PutStateWithoutKYC(giniTokenKey, []byte(tokenAddress))
 	if err != nil {
 		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to set Gini token address with Key %s", giniTokenKey), err)
