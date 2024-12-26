@@ -126,14 +126,6 @@ func calcClaimableAmount(
 	duration uint64,
 	initialUnlock *big.Int,
 ) (*big.Int, error) {
-
-
-	fmt.Println("arguments in calcClaimableAmount", timestamp,
-		totalAllocations,
-		startTimestamp,
-		duration,
-		initialUnlock)
-
 	if timestamp == 0 {
 		return big.NewInt(0), ErrCannotBeZero
 	}
@@ -159,8 +151,6 @@ func calcClaimableAmount(
 	}
 
 	elapsedIntervals := (timestamp - startTimestamp) / claimInterval
-
-	fmt.Println("elapsed intervals", elapsedIntervals)
 
 	if elapsedIntervals == 0 {
 		return big.NewInt(0), nil
