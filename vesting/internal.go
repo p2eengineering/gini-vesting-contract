@@ -179,8 +179,6 @@ func TransferGiniTokens(ctx kalpsdk.TransactionContextInterface, signer, totalCl
 	logger := kalpsdk.NewLogger()
 	logger.Infoln("TransferGiniTokens called.... with arguments ", signer, totalClaimAmount)
 
-	// return nil
-
 	giniContract, err := GetGiniTokenAddress(ctx)
 	if err != nil {
 		return err
