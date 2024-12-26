@@ -193,8 +193,6 @@ func TransferGiniTokens(ctx kalpsdk.TransactionContextInterface, signer, totalCl
 		return NewCustomError(http.StatusInternalServerError, "unable to get the channel name", nil)
 	}
 
-	// TODO: check this on stagenet also
-	// Simulate transfer of tokens (in a real system, you would interact with a token contract or handle appropriately)
 	output := ctx.InvokeChaincode(giniContract, [][]byte{[]byte(giniTransfer), []byte(signer), []byte(totalClaimAmount)}, channel)
 
 	b, _ := strconv.ParseBool(string(output.Payload))

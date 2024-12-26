@@ -95,11 +95,6 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 	return nil
 }
 
-// TODO: Need to ask if we have to accept VestingId as an int format
-// or the current string format is fine , even if it is string
-// format, we have to convert it to lower case character before
-// using it anywhere
-
 func (s *SmartContract) AddBeneficiaries(ctx kalpsdk.TransactionContextInterface, vestingID string, beneficiaries []string, amounts []string) error {
 	logger := kalpsdk.NewLogger()
 	logger.Infoln("AddBeneficiaries Invoked.... with arguments ", vestingID, beneficiaries, amounts)
