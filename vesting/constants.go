@@ -12,8 +12,7 @@ const (
 	hexAddressRegex                    = `^[0-9a-fA-F]{40}$`
 	giniTokenEvent                     = "SetGiniToken"
 	kalpFoundationKey                  = "kalp_foundation"
-	claimInterval                      = 30
-	// claimInterval                  = 30 * 24 * 60 * 60
+	claimInterval                      = 30 * 24 * 60 * 60
 
 	giniTransfer = "Transfer"
 	giniTokenKey = "giniToken"
