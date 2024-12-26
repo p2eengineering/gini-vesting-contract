@@ -126,7 +126,6 @@ func calcClaimableAmount(
 	duration uint64,
 	initialUnlock *big.Int,
 ) (*big.Int, error) {
-
 	if timestamp == 0 {
 		return big.NewInt(0), ErrCannotBeZero
 	}
