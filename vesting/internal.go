@@ -148,7 +148,7 @@ func calcClaimableAmount(
 		return big.NewInt(0), nil
 	}
 
-	elapsedIntervals := (timestamp - startTimestamp) / claimInterval
+	elapsedIntervals := (timestamp - startTimestamp) / ClaimInterval
 
 	if elapsedIntervals == 0 {
 		return big.NewInt(0), nil
@@ -164,7 +164,7 @@ func calcClaimableAmount(
 
 	elapsed := big.NewInt(int64(elapsedIntervals))
 	durationBig := big.NewInt(int64(duration))
-	durationBig.Div(durationBig, big.NewInt(claimInterval))
+	durationBig.Div(durationBig, big.NewInt(ClaimInterval))
 	claimable := new(big.Int).Div(allocationsAfterUnlock, durationBig)
 	claimable.Mul(claimable, elapsed)
 
@@ -181,7 +181,7 @@ func TransferGiniTokens(ctx kalpsdk.TransactionContextInterface, signer, totalCl
 	}
 
 	if len(giniContract) == 0 {
-		return NewCustomError(http.StatusNotFound, fmt.Sprintf("Gini token address with Key %s does not exist", giniTokenKey), nil)
+		return NewCustomError(http.StatusNotFound, fmt.Sprintf("Gini token address with Key %s does not exist", GiniTokenKey), nil)
 	}
 
 	channel := ctx.GetChannelID()
@@ -189,7 +189,7 @@ func TransferGiniTokens(ctx kalpsdk.TransactionContextInterface, signer, totalCl
 		return NewCustomError(http.StatusInternalServerError, "unable to get the channel name", nil)
 	}
 
-	output := ctx.InvokeChaincode(giniContract, [][]byte{[]byte(giniTransfer), []byte(signer), []byte(totalClaimAmount)}, channel)
+	output := ctx.InvokeChaincode(giniContract, [][]byte{[]byte(GiniTransfer), []byte(signer), []byte(totalClaimAmount)}, channel)
 
 	b, _ := strconv.ParseBool(string(output.Payload))
 

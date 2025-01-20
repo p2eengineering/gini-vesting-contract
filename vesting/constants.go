@@ -3,19 +3,19 @@ package vesting
 type TokenAllocation int
 
 const (
-	kalpFoundation                     = "0b87970433b22494faff1cc7a819e71bddc7880c"
-	kalpFoundationTotalAllocations     = "560000000000000000000000000"
-	kalpFoundationClaimedAmount        = "11200000000000000000000000"
-	kalpFoundationBeneficiaryKeyPrefix = "beneficiaries_EcosystemReserve_"
-	kalpFoundationUserVestingKeyPrefix = "uservestings_"
-	contractAddressRegex               = `^klp-[a-fA-F0-9]+-cc$`
-	hexAddressRegex                    = `^[0-9a-fA-F]{40}$`
-	giniTokenEvent                     = "SetGiniToken"
-	kalpFoundationKey                  = "kalp_foundation"
-	claimInterval                      = 30 * 24 * 60 * 60
+	KalpFoundation                     = "0b87970433b22494faff1cc7a819e71bddc7880c"
+	KalpFoundationTotalAllocations     = "560000000000000000000000000"
+	KalpFoundationClaimedAmount        = "11200000000000000000000000"
+	KalpFoundationBeneficiaryKeyPrefix = "beneficiaries_EcosystemReserve_"
+	KalpFoundationUserVestingKeyPrefix = "uservestings_"
+	ContractAddressRegex               = `^klp-[a-fA-F0-9]+-cc$`
+	HexAddressRegex                    = `^[0-9a-fA-F]{40}$`
+	GiniTokenEvent                     = "SetGiniToken"
+	KalpFoundationKey                  = "kalp_foundation"
+	ClaimInterval                      = 30 * 24 * 60 * 60
 
-	giniTransfer = "Transfer"
-	giniTokenKey = "giniToken"
+	GiniTransfer = "Transfer"
+	GiniTokenKey = "giniToken"
 
 	// Events Keys
 	ClaimKey              = "Claim"

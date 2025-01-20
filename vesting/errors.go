@@ -69,7 +69,7 @@ func ErrUserVestingsAlreadyExists(beneficiary string) error {
 }
 
 func ErrClaimAmountExceedsVestingAmount(vestingID, beneficiaryAddress, claimAmount, beneficiaryTotalAllocations string) error {
-	return fmt.Errorf("ClaimAmountExceedsVestingAmount for vesting ID %s and beneficiary %s: claimAmount=%d, totalAllocations=%d",
+	return fmt.Errorf("ClaimAmountExceedsVestingAmount for vesting ID %s and beneficiary %s: claimAmount=%s, totalAllocations=%s",
 		vestingID, beneficiaryAddress, claimAmount, beneficiaryTotalAllocations)
 }
 
@@ -79,9 +79,9 @@ func ErrInvalidVestingID(vestingID string) error {
 
 func (e *CustomError) Error() string {
 	if e.Err != nil {
-		return fmt.Sprintf("[%s] %s: %v", e.Code, e.Message, e.Err)
+		return fmt.Sprintf("[%d] %s: %v", e.Code, e.Message, e.Err)
 	}
-	return fmt.Sprintf("[%s] %s", e.Code, e.Message)
+	return fmt.Sprintf("[%d] %s", e.Code, e.Message)
 }
 
 func NewCustomError(code int, message string, err error) *CustomError {

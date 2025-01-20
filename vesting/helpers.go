@@ -38,7 +38,7 @@ func IsContractAddressValid(address string) bool {
 		return false
 	}
 
-	isValid, _ := regexp.MatchString(contractAddressRegex, address)
+	isValid, _ := regexp.MatchString(ContractAddressRegex, address)
 	return isValid
 }
 
@@ -48,7 +48,7 @@ func IsUserAddressValid(address string) bool {
 		return false
 	}
 
-	isValid, _ := regexp.MatchString(hexAddressRegex, address)
+	isValid, _ := regexp.MatchString(HexAddressRegex, address)
 	return isValid
 }
 
@@ -74,7 +74,7 @@ func IsSignerKalpFoundation(ctx kalpsdk.TransactionContextInterface) error {
 		return NewCustomError(http.StatusInternalServerError, "failed to get client id", err)
 	}
 
-	if signer != kalpFoundation {
+	if signer != KalpFoundation {
 		return NewCustomError(http.StatusBadRequest, "signer is not kalp foundation", err)
 	}
 
