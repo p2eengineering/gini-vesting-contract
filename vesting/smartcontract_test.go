@@ -165,6 +165,7 @@ func TestClaim(t *testing.T) {
 	t.Parallel()
 	transactionContext := &mocks.TransactionContext{}
 	vestingContract := vesting.SmartContract{}
+
 	// ****************START define helper functions*********************
 	worldState := map[string][]byte{}
 	transactionContext.CreateCompositeKeyStub = func(s1 string, s2 []string) (string, error) {
@@ -179,21 +180,16 @@ func TestClaim(t *testing.T) {
 		return nil
 	}
 	transactionContext.GetQueryResultStub = func(s string) (kalpsdk.StateQueryIteratorInterface, error) {
-		var docType string
-		var account string
+		var docType, account string
 
-		// finding doc type
 		re := regexp.MustCompile(`"docType"\s*:\s*"([^"]+)"`)
 		match := re.FindStringSubmatch(s)
-
 		if len(match) > 1 {
 			docType = match[1]
 		}
 
-		// finding account
 		re = regexp.MustCompile(`"account"\s*:\s*"([^"]+)"`)
 		match = re.FindStringSubmatch(s)
-
 		if len(match) > 1 {
 			account = match[1]
 		}
@@ -232,39 +228,13 @@ func TestClaim(t *testing.T) {
 		return nil
 	}
 	transactionContext.GetTxIDStub = func() string {
-		const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-		length := 10
-		rand.Seed(time.Now().UnixNano()) // Seed the random number generator
-		result := make([]byte, length)
-		for i := range result {
-			result[i] = charset[rand.Intn(len(charset))]
-		}
-		return string(result)
+		return "test-tx-id"
 	}
 	transactionContext.GetTxTimestampStub = func() (*timestamppb.Timestamp, error) {
-		// Get the current time and convert it to a protobuf timestamp
-		now := time.Now()
-		protoTimestamp := timestamppb.New(now)
-
-		// Check for potential overflow or invalid time
-		if err := protoTimestamp.CheckValid(); err != nil {
-			return nil, fmt.Errorf("invalid timestamp: %w", err)
-		}
-
-		return protoTimestamp, nil
+		return timestamppb.New(time.Now()), nil
 	}
-
 	transactionContext.GetChannelIDStub = func() string {
 		return "kalp"
-	}
-
-	transactionContext.InvokeChaincodeStub = func(s1 string, b [][]byte, s2 string) response.Response {
-		return response.Response{
-			Response: peer.Response{
-				Status:  http.StatusOK,
-				Payload: []byte("true"),
-			},
-		}
 	}
 
 	// ****************END define helper functions*********************
@@ -275,7 +245,6 @@ func TestClaim(t *testing.T) {
 		TotalAllocations: "120000000000000000",
 		ClaimedAmount:    "120000000000000",
 	}
-
 	beneficiaryAsBytes, _ := json.Marshal(beneficiary)
 
 	vestingPeriod := &vesting.VestingPeriod{
@@ -290,12 +259,27 @@ func TestClaim(t *testing.T) {
 
 	transactionContext.PutStateWithoutKYC("beneficiaries_Team_0b87970433b22494faff1cc7a819e71bddc7880c", beneficiaryAsBytes)
 	transactionContext.PutStateWithoutKYC("vestingperiod_Team", vestingAsBytes)
-	transactionContext.PutStateWithoutKYC("giniToken", []byte("klp-12345678-cc"))
 
-	// transactionContext.GetStateStub(vestingAsBytes, nil)
-	// transactionContext.GetStateReturns(beneficiaryAsBytes, nil)
+	// Test Case: Amount to claim is zero and before vesting start
+	transactionContext.GetTxTimestampStub = func() (*timestamppb.Timestamp, error) {
+		return timestamppb.New(time.Unix(1737373900, 0)), nil
+	}
 	err := vestingContract.Claim(transactionContext, vesting.Team.String())
-	require.NoError(t, err)
+	require.EqualError(t, err, vesting.ErrOnlyAfterVestingStart("Team").Error())
+
+	// Test Case: Amount to claim is zero and after vesting start
+	transactionContext.GetTxTimestampStub = func() (*timestamppb.Timestamp, error) {
+		return timestamppb.New(time.Unix(1737374050, 0)), nil
+	}
+	err = vestingContract.Claim(transactionContext, vesting.Team.String())
+	require.EqualError(t, err, "[404] Gini token address with Key giniToken does not exist")
+
+	// Test Case: Successful claim
+	beneficiary.ClaimedAmount = "0"
+	beneficiaryAsBytes, _ = json.Marshal(beneficiary)
+	transactionContext.PutStateWithoutKYC("beneficiaries_Team_0b87970433b22494faff1cc7a819e71bddc7880c", beneficiaryAsBytes)
+	err = vestingContract.Claim(transactionContext, vesting.Team.String())
+	require.Error(t, err, "NothingToClaim")
 }
 
 func TestAddBeneficiaries(t *testing.T) {
