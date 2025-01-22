@@ -572,4 +572,21 @@ func TestClaimAll(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, keyTC)
 
+	newTotalClaims := big.NewInt(300)
+	newTotalClaimsAsBytes, _ := newTotalClaims.MarshalText()
+	transactionContext.PutStateWithoutKYC(keyTC, newTotalClaimsAsBytes)
+
+	// Final check for the total claims
+	updatedTotalClaims := new(big.Int)
+	updatedTotalClaims.SetBytes(worldState[keyTC])
+	require.NotEqual(t, updatedTotalClaims.Int64(), int64(300))
+
+	vestingClaim, err := vestingContract.GetTotalClaims(transactionContext, beneficiaryAddress)
+	require.NoError(t, err)
+	require.NotEmpty(t, vestingClaim)
+
+	vestingTotalClaim, err1 := vestingContract.GetUserVestings(transactionContext, beneficiaryAddress)
+	require.NoError(t, err1)
+	fmt.Println("vestingTotalClaim", vestingTotalClaim)
+
 }
