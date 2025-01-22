@@ -140,6 +140,20 @@ func TestInitialize(t *testing.T) {
 
 	err := vestingContract.Initialize(transactionContext, 199999999)
 	require.NoError(t, err)
+
+	KalpFoundation := "0b87970433b22494faff1cc7a819e71bddc7880c"
+	KalpFoundationBeneficiaryKeyPrefix := "beneficiaries_EcosystemReserve_"
+	KalpFoundationUserVestingKeyPrefix := "uservestings_"
+	kalpFoundationBeneficiaryKey := KalpFoundationBeneficiaryKeyPrefix + KalpFoundation
+	kalpFoundationUserVestingKey := KalpFoundationUserVestingKeyPrefix + KalpFoundation
+
+	beneficiaryJSON, err1 := transactionContext.GetStateStub(kalpFoundationBeneficiaryKey)
+	require.NoError(t, err1)
+	require.NotEmpty(t, beneficiaryJSON)
+
+	userVestingJSON, err1 := transactionContext.GetStateStub(kalpFoundationUserVestingKey)
+	require.NoError(t, err1)
+	require.NotEmpty(t, userVestingJSON)
 }
 
 func TestClaim(t *testing.T) {
@@ -277,6 +291,11 @@ func TestClaim(t *testing.T) {
 	// transactionContext.GetStateReturns(beneficiaryAsBytes, nil)
 	err := vestingContract.Claim(transactionContext, vesting.Team.String())
 	require.NoError(t, err)
+
+	vestingClaim, err := vestingContract.GetTotalClaims(transactionContext, "0b87970433b22494faff1cc7a819e71bddc7880c")
+	require.NoError(t, err)
+	require.NotEmpty(t, vestingClaim)
+
 }
 
 func TestGetVestingData(t *testing.T) {
