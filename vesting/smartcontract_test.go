@@ -140,6 +140,25 @@ func TestInitialize(t *testing.T) {
 
 	err := vestingContract.Initialize(transactionContext, 199999999)
 	require.NoError(t, err)
+
+	// Test case for the invalid startTimestamp (0)
+	err = vestingContract.Initialize(transactionContext, 0) // Passing 0 should trigger the error
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "CannotBeZero")
+
+	KalpFoundation := "0b87970433b22494faff1cc7a819e71bddc7880c"
+	KalpFoundationBeneficiaryKeyPrefix := "beneficiaries_EcosystemReserve_"
+	KalpFoundationUserVestingKeyPrefix := "uservestings_"
+	kalpFoundationBeneficiaryKey := KalpFoundationBeneficiaryKeyPrefix + KalpFoundation
+	kalpFoundationUserVestingKey := KalpFoundationUserVestingKeyPrefix + KalpFoundation
+
+	beneficiaryJSON, err1 := transactionContext.GetStateStub(kalpFoundationBeneficiaryKey)
+	require.NoError(t, err1)
+	require.NotEmpty(t, beneficiaryJSON)
+
+	userVestingJSON, err1 := transactionContext.GetStateStub(kalpFoundationUserVestingKey)
+	require.NoError(t, err1)
+	require.NotEmpty(t, userVestingJSON)
 }
 
 func TestClaim(t *testing.T) {
@@ -382,6 +401,49 @@ func TestAddBeneficiaries(t *testing.T) {
 
 	err := vestingContract.AddBeneficiaries(transactionContext, vestingID, beneficiaries, amounts)
 	require.NoError(t, err)
+
+	// Test 1: BeneficiaryAlreadyexists Format
+	beneficiaries = []string{"0b87970433b22494faff1cc7a819e71bddc7880c"}
+	amounts = []string{"1000000000000000"}
+	err = vestingContract.AddBeneficiaries(transactionContext, vestingID, beneficiaries, amounts)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "BeneficiaryAlreadyExists")
+
+	// Test 2: Total Allocations Exceeds Vesting Total Supply
+	beneficiaries = []string{"0b87970433b22494faff1cc7a819e71bddc78897"}
+	amounts = []string{"10000000000000000000000000000000000"}
+	err = vestingContract.AddBeneficiaries(transactionContext, vestingID, beneficiaries, amounts)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "TotalSupplyReached")
+
+	// Test 3: Arrays Length Mismatch (beneficiaries and amounts)
+	beneficiaries = []string{"0b87970433b22494faff1cc7a819e71bddc7880c", "0b87970433b22494faff1cc7a819e71bddc7880d"}
+	amounts = []string{"1000000000000000", "2000000000000000", "3000000000000000"} // Only one amount for two beneficiaries
+
+	err = vestingContract.AddBeneficiaries(transactionContext, vestingID, beneficiaries, amounts)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "ArraysLengthMismatch")
+
+	// Test 4: Invalid Vesting ID
+	SetUserID(transactionContext, vesting.KalpFoundation)
+	vestingID1 := "Teamm"
+	beneficiaries1 := []string{"0b87970433b22494faff1cc7a819e71bddc7880c"}
+	amounts1 := []string{"1000000000000000"}
+
+	err = vestingContract.AddBeneficiaries(transactionContext, vestingID1, beneficiaries1, amounts1)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "InvalidVestingID")
+
+	// Test 5: NoBeneficiaries
+	SetUserID(transactionContext, vesting.KalpFoundation) // Set the user ID for the test
+	vestingID2 := "Team"                                  // Test vesting ID
+	beneficiaries2 := []string{}                          // Invalid beneficiaries
+	amounts2 := []string{"1000000000000000"}              // Test amounts
+
+	// Call AddBeneficiaries with the test data
+	err = vestingContract.AddBeneficiaries(transactionContext, vestingID2, beneficiaries2, amounts2)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "NoBeneficiaries")
 
 	// Verify that the beneficiaries were added to the world state
 	for i, beneficiary := range beneficiaries {
@@ -962,16 +1024,6 @@ func TestCalculateClaimAmount(t *testing.T) {
 	})
 
 	// // Test case: No claimable amount (fully claimed)
-	// t.Run("Fully claimed scenario", func(t *testing.T) {
-	// 	beneficiary.ClaimedAmount = "1000" // Set claimed amount equal to total allocations
-	// 	beneficiaryBytes, _ := json.Marshal(beneficiary)
-	// 	worldState[beneficiaryKey] = beneficiaryBytes
-
-	// 	claimAmount, err := vestingContract.CalculateClaimAmount(transactionContext, "0b87970433b22494faff1cc7a819e71bddc7880c", "Team")
-	// 	require.NoError(t, err)
-	// 	require.Equal(t, "-825", claimAmount, "Claim amount should be 0 when fully claimed")
-	// })
-
 	t.Run("Fully claimed scenario", func(t *testing.T) {
 		// Successful scenario: Beneficiary has fully claimed amount
 		beneficiary := vesting.Beneficiary{
@@ -1015,12 +1067,12 @@ func TestCalculateClaimAmount(t *testing.T) {
 	// t.Run("Claim exceeds total allocations", func(t *testing.T) {
 	// 	beneficiary.ClaimedAmount = "166666950"
 	// 	beneficiary.TotalAllocations = "1000"
-	// 	beneficiaryBytes, _ = json.Marshal(beneficiary)
+	// 	beneficiaryBytes, _ := json.Marshal(beneficiary)
 	// 	worldState[beneficiaryKey] = beneficiaryBytes
 
 	// 	// Adjust vesting period for test (optional, depending on your logic)
 	// 	vestingPeriod.Duration = 1
-	// 	vestingBytes, _ = json.Marshal(vestingPeriod)
+	// 	vestingBytes, _ := json.Marshal(vestingPeriod)
 	// 	worldState[vestingKey] = vestingBytes
 
 	// 	// Simulate a claim amount that exceeds the total allocation
@@ -1034,6 +1086,7 @@ func TestCalculateClaimAmount(t *testing.T) {
 	// 	expectedErrorMsg := "ClaimAmountExceedsVestingAmount for vesting ID Team and beneficiary 0b87970433b22494faff1cc7a819e71bddc7880c"
 	// 	require.Contains(t, err.Error(), expectedErrorMsg, "Error message should contain expected information")
 	// })
+
 }
 
 func TestClaimAll(t *testing.T) {
@@ -1183,4 +1236,68 @@ func TestClaimAll(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, keyTC)
 
+	newTotalClaims := big.NewInt(300)
+	newTotalClaimsAsBytes, _ := newTotalClaims.MarshalText()
+	transactionContext.PutStateWithoutKYC(keyTC, newTotalClaimsAsBytes)
+
+	// Final check for the total claims
+	updatedTotalClaims := new(big.Int)
+	updatedTotalClaims.SetBytes(worldState[keyTC])
+	require.NotEqual(t, updatedTotalClaims.Int64(), int64(300))
+
+	vestingClaim, err := vestingContract.GetTotalClaims(transactionContext, beneficiaryAddress)
+	require.NoError(t, err)
+	require.NotEmpty(t, vestingClaim)
+
+	vestingTotalClaim, err1 := vestingContract.GetUserVestings(transactionContext, beneficiaryAddress)
+	require.NoError(t, err1)
+	fmt.Println("vestingTotalClaim", vestingTotalClaim)
+
+}
+
+func TestGetClaimsAmountForAllVestings(t *testing.T) {
+	// Initialize mock context
+	transactionContext := &mocks.TransactionContext{}
+	vestingContract := vesting.SmartContract{}
+
+	// Define the mock world state (similar to the GetStateStub)
+	worldState := map[string][]byte{}
+
+	// Mock the GetState method
+	transactionContext.GetStateStub = func(s string) ([]byte, error) {
+		data, found := worldState[s]
+		if found {
+			return data, nil
+		}
+		return nil, nil
+	}
+
+	beneficiaryAddress := "0b87970433b22494faff1cc7a819e71bddc7880c"
+	allClaims, err := vestingContract.GetClaimsAmountForAllVestings(transactionContext, beneficiaryAddress)
+	require.NoError(t, err)
+	require.NotNil(t, allClaims)
+
+	// type UserVestings []string
+	KalpFoundation := "0b87970433b22494faff1cc7a819e71bddc7880c"
+	userVestingList := &vesting.UserVestings{"10"}
+
+	userVestingKey := fmt.Sprintf("uservestings_%s", KalpFoundation)
+	updatedUserVestingBytes, _ := json.Marshal(userVestingList)
+	err = transactionContext.PutStateWithoutKYC(userVestingKey, updatedUserVestingBytes)
+	require.NoError(t, err)
+
+	userVestingListRes, err1 := vestingContract.GetUserVestings(transactionContext, beneficiaryAddress)
+	require.NoError(t, err1)
+	require.NotNil(t, userVestingListRes)
+
+	amounts := make([]string, 1)
+	amounts[0] = "1000"
+
+	ExpectedClaimsWithAllVestings := &vesting.ClaimsWithAllVestings{
+		TotalAmount:  "1000",
+		UserVestings: userVestingListRes.UserVestings,
+		Amounts:      amounts,
+	}
+	require.NotNil(t, ExpectedClaimsWithAllVestings)
+	require.ElementsMatch(t, []string{"1000"}, ExpectedClaimsWithAllVestings.Amounts)
 }
