@@ -3,6 +3,7 @@ package vesting_test
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -51,6 +52,97 @@ func SetUserID(transactionContext *mocks.TransactionContext, userID string) {
 	clientIdentity := &mocks.ClientIdentity{}
 	clientIdentity.GetIDReturns(b64ID, nil)
 	transactionContext.GetClientIdentityReturns(clientIdentity)
+}
+
+func TestIsSignerKalpFoundation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		setupMock      func(*mocks.TransactionContext)
+		expectedResult bool
+		shouldError    bool
+	}{
+
+		{
+			name: "Failure - GetID error",
+			setupMock: func(ctx *mocks.TransactionContext) {
+				clientIdentity := &mocks.ClientIdentity{}
+				clientIdentity.GetIDReturns("", errors.New("failed to get ID"))
+				ctx.GetClientIdentityReturns(clientIdentity)
+			},
+			expectedResult: false,
+			shouldError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := &mocks.TransactionContext{}
+			tt.setupMock(ctx)
+
+			err := vesting.IsSignerKalpFoundation(ctx)
+
+			if tt.shouldError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestIsContractPreInitialize(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		testName       string
+		setupContext   func(*mocks.TransactionContext, map[string][]byte, *vesting.SmartContract)
+		expectedResult bool
+		timestamp      uint64
+		shouldError    bool
+	}{
+
+		{
+			testName: "Failure - Cannot delete foundation role",
+
+			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
+				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				ctx.GetKYCReturns(true, nil)
+				err := contract.Initialize(ctx, 12312123)
+				require.NoError(t, err)
+				// require.True(t, ok)
+			},
+			timestamp:   12312123,
+			shouldError: false,
+			// userID: constants.KalpFoundationAddress,
+			// expectedError: fmt.Errorf("foundation role cannot be deleted"),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			t.Parallel()
+			transactionContext := &mocks.TransactionContext{}
+			vestingContract := &vesting.SmartContract{}
+			worldState := map[string][]byte{}
+
+			// ctx := &mocks.TransactionContext{}
+			tt.setupContext(transactionContext, worldState, vestingContract)
+
+			err := vestingContract.Initialize(transactionContext, tt.timestamp)
+
+			if tt.shouldError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestInitialize(t *testing.T) {
@@ -1284,4 +1376,388 @@ func TestGetClaimsAmountForAllVestings(t *testing.T) {
 	}
 	require.NotNil(t, ExpectedClaimsWithAllVestings)
 	require.ElementsMatch(t, []string{"1000"}, ExpectedClaimsWithAllVestings.Amounts)
+}
+
+func TestClaimIsCorrectVesting(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		testName       string
+		setupContext   func(*mocks.TransactionContext, map[string][]byte, *vesting.SmartContract)
+		expectedResult bool
+		vestingID      string
+		shouldError    bool
+	}{
+
+		{
+			testName: "Failure - Cannot delete foundation role",
+
+			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
+				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				ctx.GetKYCReturns(true, nil)
+				err := contract.Initialize(ctx, 12312123)
+				require.NoError(t, err)
+				// require.True(t, ok)
+			},
+			vestingID:   "",
+			shouldError: true,
+			// userID: constants.KalpFoundationAddress,
+			// expectedError: fmt.Errorf("foundation role cannot be deleted"),
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			t.Parallel()
+			transactionContext := &mocks.TransactionContext{}
+			vestingContract := &vesting.SmartContract{}
+			worldState := map[string][]byte{}
+
+			// ctx := &mocks.TransactionContext{}
+			tt.setupContext(transactionContext, worldState, vestingContract)
+
+			err := vestingContract.Claim(transactionContext, tt.vestingID)
+
+			if tt.shouldError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestClaimIsGetClient(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		testName       string
+		setupContext   func(*mocks.TransactionContext, map[string][]byte, *vesting.SmartContract)
+		expectedResult bool
+		vestingID      string
+		expectedError  error
+	}{
+
+		{
+			testName: "Failure - failed to get client id",
+			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
+				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				ctx.GetKYCReturns(true, nil)
+				err := contract.Initialize(ctx, 12312123)
+				require.NoError(t, err)
+
+				SetUserID(ctx, "87970433b22494faff1cc7a819e71bddc7880c")
+			},
+			vestingID:     "Team",
+			expectedError: errors.New("InvalidUserAddress for userAddress 87970433b22494faff1cc7a819e71bddc7880c"),
+			// userID: constants.KalpFoundationAddress,
+			// expectedError: fmt.Errorf("foundation role cannot be deleted"),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			t.Parallel()
+			transactionContext := &mocks.TransactionContext{}
+			vestingContract := &vesting.SmartContract{}
+			worldState := map[string][]byte{}
+
+			// ctx := &mocks.TransactionContext{}
+			tt.setupContext(transactionContext, worldState, vestingContract)
+
+			err := vestingContract.Claim(transactionContext, tt.vestingID)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestClaimIsAmountValid(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		testName       string
+		setupContext   func(*mocks.TransactionContext, map[string][]byte, *vesting.SmartContract)
+		expectedResult bool
+		vestingID      string
+		expectedError  error
+	}{
+
+		{
+			testName: "Failure - Invalid amount",
+			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
+				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				ctx.GetKYCReturns(true, nil)
+				err := contract.Initialize(ctx, 12312123)
+				require.NoError(t, err)
+			},
+			vestingID:     "Team",
+			expectedError: errors.New("InvalidUserAddress for userAddress 87970433b22494faff1cc7a819e71bddc7880c"),
+			// userID: constants.KalpFoundationAddress,
+			// expectedError: fmt.Errorf("foundation role cannot be deleted"),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			t.Parallel()
+			transactionContext := &mocks.TransactionContext{}
+			vestingContract := &vesting.SmartContract{}
+			worldState := map[string][]byte{}
+
+			// ctx := &mocks.TransactionContext{}
+			tt.setupContext(transactionContext, worldState, vestingContract)
+
+			err := vestingContract.Claim(transactionContext, tt.vestingID)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestClaimIsCorrectVestingId(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		testName       string
+		setupContext   func(*mocks.TransactionContext, map[string][]byte, *vesting.SmartContract)
+		expectedResult bool
+		vestingID      string
+		shouldError    bool
+	}{
+
+		{
+			testName: "Failure - failed to get beneficiary data for vestingID",
+
+			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
+				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				ctx.GetKYCReturns(true, nil)
+				err := contract.Initialize(ctx, 12312123)
+				require.NoError(t, err)
+				// require.True(t, ok)
+			},
+			vestingID:   "Teams",
+			shouldError: true,
+			// userID: constants.KalpFoundationAddress,
+			// expectedError: fmt.Errorf("foundation role cannot be deleted"),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			t.Parallel()
+			transactionContext := &mocks.TransactionContext{}
+			vestingContract := &vesting.SmartContract{}
+			worldState := map[string][]byte{}
+
+			// ctx := &mocks.TransactionContext{}
+			tt.setupContext(transactionContext, worldState, vestingContract)
+
+			err := vestingContract.Claim(transactionContext, tt.vestingID)
+
+			if tt.shouldError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestClaimAllIsCorrectVesting(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		testName       string
+		setupContext   func(*mocks.TransactionContext, map[string][]byte, *vesting.SmartContract)
+		expectedResult bool
+		beneficaryID   string
+		shouldError    bool
+	}{
+
+		{
+			testName: "Failure - Cannot delete foundation role",
+
+			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
+				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				ctx.GetKYCReturns(true, nil)
+				err := contract.Initialize(ctx, 12312123)
+				require.NoError(t, err)
+				// require.True(t, ok)
+			},
+			beneficaryID: "",
+			shouldError:  true,
+			// userID: constants.KalpFoundationAddress,
+			// expectedError: fmt.Errorf("foundation role cannot be deleted"),
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			t.Parallel()
+			transactionContext := &mocks.TransactionContext{}
+			vestingContract := &vesting.SmartContract{}
+			worldState := map[string][]byte{}
+
+			// ctx := &mocks.TransactionContext{}
+			tt.setupContext(transactionContext, worldState, vestingContract)
+
+			err := vestingContract.ClaimAll(transactionContext, tt.beneficaryID)
+
+			if tt.shouldError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestIsAddBeneficiaries(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		testName       string
+		setupContext   func(*mocks.TransactionContext, map[string][]byte, *vesting.SmartContract)
+		expectedResult bool
+		vestingID      string
+		beneficiaries  []string
+		amounts        []string
+		expectedError  error
+	}{
+
+		{
+			testName: "Failure - Cannot delete foundation role",
+
+			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
+				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				ctx.GetKYCReturns(true, nil)
+				err := contract.Initialize(ctx, 12312123)
+				require.NoError(t, err)
+				// require.True(t, ok)
+			},
+			vestingID:     "",
+			beneficiaries: nil,
+			amounts:       nil,
+			expectedError: vesting.ErrNoBeneficiaries,
+			// userID: constants.KalpFoundationAddress,
+			// expectedError: fmt.Errorf("foundation role cannot be deleted"),
+		},
+
+		{
+			testName: "Failure - Cannot delete foundation role",
+
+			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
+				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				ctx.GetKYCReturns(true, nil)
+				err := contract.Initialize(ctx, 12312123)
+				require.NoError(t, err)
+				// require.True(t, ok)
+			},
+			vestingID:     "Team",
+			beneficiaries: []string{"0b87970433b22494faff1cc7a819e71bddc7880c", "0b87970433b22494faff1cc7a819e71bddc7880c"},
+			amounts:       []string{"1000"},
+			expectedError: vesting.ErrArraysLengthMismatch(2, 1),
+			// userID: constants.KalpFoundationAddress,
+			// expectedError: fmt.Errorf("foundation role cannot be deleted"),
+		},
+		{
+			testName: "Failure - Cannot delete foundation role",
+
+			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
+				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				ctx.GetKYCReturns(true, nil)
+				err := contract.Initialize(ctx, 12312123)
+				require.NoError(t, err)
+				// require.True(t, ok)
+			},
+			vestingID:     "Team",
+			beneficiaries: []string{"0b87970433b22494faff1cc7a819e71bddc7880c", "0b87970433b22494faff1cc7a819e71bddc7880c"},
+			amounts:       []string{"1000.000"},
+			expectedError: vesting.ErrInvalidAmount("Entity", "Value", "1000.000"),
+			// userID: constants.KalpFoundationAddress,
+			// expectedError: fmt.Errorf("foundation role cannot be deleted"),
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			t.Parallel()
+			transactionContext := &mocks.TransactionContext{}
+			vestingContract := &vesting.SmartContract{}
+			worldState := map[string][]byte{}
+
+			// ctx := &mocks.TransactionContext{}
+			tt.setupContext(transactionContext, worldState, vestingContract)
+
+			err := vestingContract.AddBeneficiaries(transactionContext, tt.vestingID, tt.beneficiaries, tt.amounts)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestGetVestingDataIsGetClient(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		testName       string
+		setupContext   func(*mocks.TransactionContext, map[string][]byte, *vesting.SmartContract)
+		expectedResult bool
+		vestingID      string
+		expectedError  error
+	}{
+
+		{
+			testName: "Failure - failed to get client id",
+			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
+				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				ctx.GetKYCReturns(true, nil)
+				err := contract.Initialize(ctx, 12312123)
+				require.NoError(t, err)
+
+				SetUserID(ctx, "87970433b22494faff1cc7a819e71bddc7880c")
+			},
+			vestingID:     "Team",
+			expectedError: vesting.NewCustomError(402, "failed to get client id", fmt.Errorf("new erro")),
+			// userID: constants.KalpFoundationAddress,
+			// expectedError: fmt.Errorf("foundation role cannot be deleted"),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			t.Parallel()
+			transactionContext := &mocks.TransactionContext{}
+			vestingContract := &vesting.SmartContract{}
+			worldState := map[string][]byte{}
+
+			// ctx := &mocks.TransactionContext{}
+			tt.setupContext(transactionContext, worldState, vestingContract)
+
+			v1, err := vestingContract.GetVestingData(transactionContext, tt.vestingID)
+			fmt.Println(v1)
+			if tt.expectedError != nil {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
