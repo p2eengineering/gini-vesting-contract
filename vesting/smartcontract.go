@@ -24,25 +24,25 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 		return err
 	}
 
-	kalpFoundationBeneficiaryKey := KalpFoundationBeneficiaryKeyPrefix + KalpFoundation
-	kalpFoundationUserVestingKey := KalpFoundationUserVestingKeyPrefix + KalpFoundation
+	kalpFoundationBeneficiaryKey := kalpFoundationBeneficiaryKeyPrefix + kalpFoundation
+	kalpFoundationUserVestingKey := kalpFoundationUserVestingKeyPrefix + kalpFoundation
 
 	beneficiaryJSON, err := ctx.GetState(kalpFoundationBeneficiaryKey)
 	if err != nil {
-		return fmt.Errorf("failed to get Beneficiary struct for %s, %v", KalpFoundation, err)
+		return fmt.Errorf("failed to get Beneficiary struct for %s, %v", kalpFoundation, err)
 	}
 
 	if beneficiaryJSON != nil {
-		return fmt.Errorf("Contract is already initialised as %v", ErrBeneficiaryAlreadyExists(KalpFoundation))
+		return fmt.Errorf("Contract is already initialised as %v", ErrBeneficiaryAlreadyExists(kalpFoundation))
 	}
 
 	userVestingJSON, err := ctx.GetState(kalpFoundationUserVestingKey)
 	if err != nil {
-		return fmt.Errorf("failed to get User vesting struct for %s, %v", KalpFoundation, err)
+		return fmt.Errorf("failed to get User vesting struct for %s, %v", kalpFoundation, err)
 	}
 
 	if userVestingJSON != nil {
-		return fmt.Errorf("Contract is already initialised as %v", ErrUserVestingsAlreadyExists(KalpFoundation))
+		return fmt.Errorf("Contract is already initialised as %v", ErrUserVestingsAlreadyExists(kalpFoundation))
 	}
 
 	validateNSetVesting(ctx, Team.String(), 30*12*24*60*60, startTimestamp, 30*24*24*60*60, ConvertGiniToWei(300000000), 0)
@@ -58,20 +58,20 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 	validateNSetVesting(ctx, LiquidityPool.String(), 0, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(200000000), 25)
 	validateNSetVesting(ctx, PublicAllocation.String(), 30*3*24*60*60, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(60000000), 25)
 
-	err = SetBeneficiary(ctx, EcosystemReserve.String(), KalpFoundation, &Beneficiary{
-		TotalAllocations: KalpFoundationTotalAllocations,
-		ClaimedAmount:    KalpFoundationClaimedAmount,
+	err = SetBeneficiary(ctx, EcosystemReserve.String(), kalpFoundation, &Beneficiary{
+		TotalAllocations: kalpFoundationTotalAllocations,
+		ClaimedAmount:    kalpFoundationClaimedAmount,
 	})
 	if err != nil {
 		return NewCustomError(http.StatusInternalServerError, "failed to set beneficiaries", err)
 	}
 
-	EmitBeneficiariesAdded(ctx, EcosystemReserve.String(), KalpFoundationTotalAllocations)
+	EmitBeneficiariesAdded(ctx, EcosystemReserve.String(), kalpFoundationTotalAllocations)
 
-	EmitClaim(ctx, KalpFoundation, EcosystemReserve.String(), KalpFoundationClaimedAmount)
+	EmitClaim(ctx, kalpFoundation, EcosystemReserve.String(), kalpFoundationClaimedAmount)
 
 	userVestingList := UserVestings{EcosystemReserve.String()}
-	err = SetUserVesting(ctx, KalpFoundation, userVestingList)
+	err = SetUserVesting(ctx, kalpFoundation, userVestingList)
 	if err != nil {
 		return NewCustomError(http.StatusInternalServerError, "failed to set user vestings", err)
 	}

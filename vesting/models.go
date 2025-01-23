@@ -230,26 +230,26 @@ func SetTotalClaims(ctx kalpsdk.TransactionContextInterface, vestingID string, t
 }
 
 func GetGiniTokenAddress(ctx kalpsdk.TransactionContextInterface) (string, error) {
-	giniTokenAddressBytes, err := ctx.GetState(GiniTokenKey)
+	giniTokenAddressBytes, err := ctx.GetState(giniTokenKey)
 	if err != nil {
-		return "", NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get Gini token address with Key %s", GiniTokenKey), err)
+		return "", NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get Gini token address with Key %s", giniTokenKey), err)
 	}
 
 	return string(giniTokenAddressBytes), nil
 }
 
 func SetGiniTokenAddress(ctx kalpsdk.TransactionContextInterface, tokenAddress string) error {
-	existingAddress, err := ctx.GetState(GiniTokenKey)
+	existingAddress, err := ctx.GetState(giniTokenKey)
 	if err != nil {
-		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get Gini token address with Key %s", GiniTokenKey), err)
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get Gini token address with Key %s", giniTokenKey), err)
 	}
 	if existingAddress != nil && string(existingAddress) != "" {
 		return NewCustomError(http.StatusConflict, "Gini token address is already set", nil)
 	}
 
-	err = ctx.PutStateWithoutKYC(GiniTokenKey, []byte(tokenAddress))
+	err = ctx.PutStateWithoutKYC(giniTokenKey, []byte(tokenAddress))
 	if err != nil {
-		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to set Gini token address with Key %s", GiniTokenKey), err)
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to set Gini token address with Key %s", giniTokenKey), err)
 	}
 
 	return nil

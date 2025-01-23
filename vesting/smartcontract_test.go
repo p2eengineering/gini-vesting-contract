@@ -24,6 +24,66 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+
+type TokenAllocation int
+
+const (
+	KalpFoundation                     = "0b87970433b22494faff1cc7a819e71bddc7880c"
+	KalpFoundationTotalAllocations     = "560000000000000000000000000"
+	KalpFoundationClaimedAmount        = "11200000000000000000000000"
+	KalpFoundationBeneficiaryKeyPrefix = "beneficiaries_EcosystemReserve_"
+	KalpFoundationUserVestingKeyPrefix = "uservestings_"
+	ContractAddressRegex               = `^klp-[a-fA-F0-9]+-cc$`
+	HexAddressRegex                    = `^[0-9a-fA-F]{40}$`
+	GiniTokenEvent                     = "SetGiniToken"
+	KalpFoundationKey                  = "kalp_foundation"
+	ClaimInterval                      = 30 * 24 * 60 * 60
+
+	GiniTransfer = "Transfer"
+	GiniTokenKey = "giniToken"
+
+	// Events Keys
+	ClaimKey              = "Claim"
+	BeneficiariesAddedKey = "BeneficiariesAdded"
+	VestingInitializedKey = "VestingInitialized"
+)
+
+const (
+	Team TokenAllocation = iota
+	Foundation
+	AngelRound
+	SeedRound
+	PrivateRound1
+	PrivateRound2
+	Advisors
+	KOLRound
+	Marketing
+	StakingRewards
+	EcosystemReserve
+	Airdrop
+	LiquidityPool
+	PublicAllocation
+)
+
+func (t TokenAllocation) String() string {
+	return [...]string{
+		"Team",
+		"Foundation",
+		"AngelRound",
+		"SeedRound",
+		"PrivateRound1",
+		"PrivateRound2",
+		"Advisors",
+		"KOLRound",
+		"Marketing",
+		"StakingRewards",
+		"EcosystemReserve",
+		"Airdrop",
+		"LiquidityPool",
+		"PublicAllocation",
+	}[t]
+}
+
 type transactionContext interface {
 	kalpsdk.TransactionContextInterface
 }
@@ -227,7 +287,7 @@ func TestInitialize(t *testing.T) {
 	}
 	// ****************END define helper functions*********************
 
-	SetUserID(transactionContext, vesting.KalpFoundation)
+	SetUserID(transactionContext, KalpFoundation)
 	// transactionContext.GetKYCReturns(true, nil)
 
 	err := vestingContract.Initialize(transactionContext, 199999999)
@@ -331,7 +391,7 @@ func TestClaim(t *testing.T) {
 
 	// ****************END define helper functions*********************
 
-	SetUserID(transactionContext, vesting.KalpFoundation)
+	SetUserID(transactionContext, KalpFoundation)
 
 	beneficiary := &vesting.Beneficiary{
 		TotalAllocations: "120000000000000000",
@@ -457,7 +517,7 @@ func TestAddBeneficiaries(t *testing.T) {
 
 	// ****************END define helper functions*********************
 
-	SetUserID(transactionContext, vesting.KalpFoundation)
+	SetUserID(transactionContext, KalpFoundation)
 
 	vestingID := "Team"
 	vestingPeriod := &vesting.VestingPeriod{
@@ -501,7 +561,7 @@ func TestAddBeneficiaries(t *testing.T) {
 	require.Contains(t, err.Error(), "ArraysLengthMismatch")
 
 	// Test 4: Invalid Vesting ID
-	SetUserID(transactionContext, vesting.KalpFoundation)
+	SetUserID(transactionContext, KalpFoundation)
 	vestingID1 := "Teamm"
 	beneficiaries1 := []string{"0b87970433b22494faff1cc7a819e71bddc7880c"}
 	amounts1 := []string{"1000000000000000"}
@@ -511,7 +571,7 @@ func TestAddBeneficiaries(t *testing.T) {
 	require.Contains(t, err.Error(), "InvalidVestingID")
 
 	// Test 5: NoBeneficiaries
-	SetUserID(transactionContext, vesting.KalpFoundation) // Set the user ID for the test
+	SetUserID(transactionContext, KalpFoundation) // Set the user ID for the test
 	vestingID2 := "Team"                                  // Test vesting ID
 	beneficiaries2 := []string{}                          // Invalid beneficiaries
 	amounts2 := []string{"1000000000000000"}              // Test amounts
@@ -570,7 +630,7 @@ func TestSetGiniToken(t *testing.T) {
 	// ****************END define helper functions*********************
 
 	// Set user identity for the test
-	SetUserID(transactionContext, vesting.KalpFoundation)
+	SetUserID(transactionContext, KalpFoundation)
 
 	// Test case 1: Valid token address when no address is set yet
 	tokenAddress := "klp-123abc456def-cc"
@@ -1001,7 +1061,7 @@ func TestGetVestingData(t *testing.T) {
 		worldState[totalClaimsKey] = []byte("100000")
 
 		// Set up the mock user identity
-		SetUserID(transactionContext, vesting.KalpFoundation)
+		SetUserID(transactionContext, KalpFoundation)
 
 		// Expected result for the valid scenario
 		expectedVestingData := &vesting.VestingData{
@@ -1284,7 +1344,7 @@ func TestClaimAll(t *testing.T) {
 	updatedUserVestingJSON, _ := json.Marshal(userList)
 	transactionContext.PutStateWithoutKYC(userVestingKey, updatedUserVestingJSON)
 
-	SetUserID(transactionContext, vesting.KalpFoundation)
+	SetUserID(transactionContext, KalpFoundation)
 
 	beneficiary := &vesting.Beneficiary{
 		TotalAllocations: "120000000000000000",

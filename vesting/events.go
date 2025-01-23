@@ -86,7 +86,7 @@ func EmitSetGiniToken(ctx kalpsdk.TransactionContextInterface, tokenAddress stri
 		return fmt.Errorf("failed to marshal event data: %v", err)
 	}
 
-	err = ctx.SetEvent(GiniTokenEvent, eventBytes)
+	err = ctx.SetEvent(giniTokenEvent, eventBytes)
 	if err != nil {
 		return fmt.Errorf("failed to emit SetGiniToken event: %v", err)
 	}
