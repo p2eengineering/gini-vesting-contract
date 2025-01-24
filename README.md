@@ -9,7 +9,15 @@ You can run all tests in the project by executing the following command:
 ```bash
 make test
 ```
- 
+
+You can visualize code coverage in the project by executing the following command:
+
+```bash
+make cover
+```
+
+Below Section can be used for reference.
+
 ### Generating a Coverage Report
  
 To generate a detailed coverage report and save it to a file:
