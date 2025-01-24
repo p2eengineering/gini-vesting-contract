@@ -33,7 +33,7 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 	}
 
 	if beneficiaryJSON != nil {
-		return fmt.Errorf("Contract is already initialised as %w: %s", ErrBeneficiaryAlreadyExists(kalpFoundation))
+		return fmt.Errorf("Contract is already initialised as %v", ErrBeneficiaryAlreadyExists(kalpFoundation))
 	}
 
 	userVestingJSON, err := ctx.GetState(kalpFoundationUserVestingKey)
@@ -42,7 +42,7 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 	}
 
 	if userVestingJSON != nil {
-		return fmt.Errorf("Contract is already initialised as %w: %s", ErrUserVestingsAlreadyExists(kalpFoundation))
+		return fmt.Errorf("Contract is already initialised as %v", ErrUserVestingsAlreadyExists(kalpFoundation))
 	}
 
 	validateNSetVesting(ctx, Team.String(), 30*12*24*60*60, startTimestamp, 30*24*24*60*60, ConvertGiniToWei(300000000), 0)
