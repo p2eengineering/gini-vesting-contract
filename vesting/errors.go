@@ -15,6 +15,7 @@ var (
 	ErrDurationCannotBeZeroForClaimAmount = errors.New("DurationCannotBeZero")
 	ErrTotalAllocationCannotBeNonPositive = errors.New("TotalAllocationCannotBeNonPositive")
 	ErrInitialUnlockCannotBeNegative      = errors.New("InitialUnlockCannotBeNegative")
+	ErrEmptyAddress                       = errors.New("ErrEmptyAddress")
 )
 
 type CustomError struct {
@@ -23,6 +24,13 @@ type CustomError struct {
 	Err     error
 }
 
+func ErrStartTimestampLessThanCurrentTimeStamp(startTimeStamp, currentTime uint64) error {
+	return fmt.Errorf("start timestamp %d is less than the current time %d", startTimeStamp, currentTime)
+}
+
+func ErrRegexValidationFailed(field string, address string, err error) error {
+	return fmt.Errorf("failed to validate %s for address %s due to regex error: %v", field, address, err)
+}
 
 func ErrInvalidUserAddress(userAddress string) error {
 	return fmt.Errorf("InvalidUserAddress for userAddress %s", userAddress)
@@ -34,6 +42,10 @@ func ErrDurationCannotBeZero(vestingID string) error {
 
 func ErrTotalSupplyCannotBeNonPositive(vestingID string) error {
 	return fmt.Errorf("TotalSupplyCannotBeNonPositive for vestingID %s", vestingID)
+}
+
+func ErrTotalSupplyCannotBeNegative(vestingID string) error {
+	return fmt.Errorf("TotalSupplyCannotBeNegative for vestingID %s", vestingID)
 }
 
 func ErrInvalidAmount(entity, value, amount string) error {
