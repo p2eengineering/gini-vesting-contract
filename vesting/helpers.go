@@ -25,31 +25,44 @@ func GetUserId(ctx kalpsdk.TransactionContextInterface) (string, error) {
 	completeId := string(decodeID)
 	userId := completeId[(strings.Index(completeId, "x509::CN=") + 9):strings.Index(completeId, ",")]
 
-	if !IsUserAddressValid(userId) {
+	isUser, err := IsUserAddressValid(userId)
+	if err != nil {
+		return "", err
+	}
+
+	if !isUser {
 		return "", ErrInvalidUserAddress(userId)
 	}
 
 	return userId, nil
 }
 
-func IsContractAddressValid(address string) bool {
+func IsContractAddressValid(address string) (bool, error) {
 
 	if address == "" {
-		return false
+		return false, ErrEmptyAddress
 	}
 
-	isValid, _ := regexp.MatchString(contractAddressRegex, address)
-	return isValid
+	isValid, err := regexp.MatchString(contractAddressRegex, address)
+	if err != nil {
+		return false, ErrRegexValidationFailed("contract address", address, err)
+	}
+
+	return isValid, nil
 }
 
-func IsUserAddressValid(address string) bool {
+func IsUserAddressValid(address string) (bool, error) {
 
 	if address == "" {
-		return false
+		return false, ErrEmptyAddress
 	}
 
-	isValid, _ := regexp.MatchString(hexAddressRegex, address)
-	return isValid
+	isValid, err := regexp.MatchString(hexAddressRegex, address)
+	if err != nil {
+		return false, ErrRegexValidationFailed("user address", address, err)
+	}
+
+	return isValid, nil
 }
 
 func Decimals() uint64 {

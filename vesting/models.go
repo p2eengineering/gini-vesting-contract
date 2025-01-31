@@ -56,7 +56,11 @@ type TotalClaimsWithAllVestings struct {
 }
 
 func GetBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, beneficiaryID string) (*Beneficiary, error) {
-	beneficiaryKey := fmt.Sprintf("beneficiaries_%s_%s", vestingID, beneficiaryID)
+	beneficiaryKey, err := ctx.CreateCompositeKey(BeneficiariesPrefix, []string{vestingID, beneficiaryID})
+	if err != nil {
+		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to create the composite key for GetBeneficiary with vestingID %s and beneficiaryID with address %s", vestingID, beneficiaryID), err)
+	}
+
 	beneficiaryAsBytes, err := ctx.GetState(beneficiaryKey)
 	if err != nil {
 		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get beneficiary with Key %s", beneficiaryKey), err)
@@ -75,7 +79,11 @@ func GetBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 }
 
 func SetBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, beneficiaryID string, beneficiary *Beneficiary) error {
-	beneficiaryKey := fmt.Sprintf("beneficiaries_%s_%s", vestingID, beneficiaryID)
+	beneficiaryKey, err := ctx.CreateCompositeKey(BeneficiariesPrefix, []string{vestingID, beneficiaryID})
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to create the composite key for SetBeneficiary with vestingID %s and beneficiaryID with address %s", vestingID, beneficiaryID), err)
+	}
+
 	beneficiaryAsBytes, err := json.Marshal(beneficiary)
 	if err != nil {
 		return NewCustomError(http.StatusInternalServerError, "failed to marshal beneficiaries", err)
@@ -90,7 +98,11 @@ func SetBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 }
 
 func GetVestingPeriod(ctx kalpsdk.TransactionContextInterface, vestingID string) (*VestingPeriod, error) {
-	vestingKey := fmt.Sprintf("vestingperiod_%s", vestingID)
+	vestingKey, err := ctx.CreateCompositeKey(VestingPeriodPrefix, []string{vestingID})
+	if err != nil {
+		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to create the composite key for GetVestingPeriod with vestingID %s", vestingID), err)
+	}
+
 	vestingAsBytes, err := ctx.GetState(vestingKey)
 	if err != nil {
 		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get vesting with Key %s", vestingKey), err)
@@ -109,7 +121,11 @@ func GetVestingPeriod(ctx kalpsdk.TransactionContextInterface, vestingID string)
 }
 
 func SetVestingPeriod(ctx kalpsdk.TransactionContextInterface, vestingID string, vesting *VestingPeriod) error {
-	vestingKey := fmt.Sprintf("vestingperiod_%s", vestingID)
+	vestingKey, err := ctx.CreateCompositeKey(VestingPeriodPrefix, []string{vestingID})
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to create the composite key for SetVestingPeriod with vestingID %s", vestingID), err)
+	}
+
 	vestingAsBytes, err := json.Marshal(vesting)
 	if err != nil {
 		return NewCustomError(http.StatusInternalServerError, "failed to marshal vesting", err)
@@ -124,7 +140,11 @@ func SetVestingPeriod(ctx kalpsdk.TransactionContextInterface, vestingID string,
 }
 
 func GetUserVesting(ctx kalpsdk.TransactionContextInterface, beneficiaryID string) (UserVestings, error) {
-	userVestingKey := fmt.Sprintf("uservestings_%s", beneficiaryID)
+	userVestingKey, err := ctx.CreateCompositeKey(UserVestingsPrefix, []string{beneficiaryID})
+	if err != nil {
+		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to create the composite key for GetUserVesting with beneficiaryID %s", beneficiaryID), err)
+	}
+
 	userVestingJSON, err := ctx.GetState(userVestingKey)
 	if err != nil {
 		return nil, NewCustomError(http.StatusNotFound, fmt.Sprintf("Failed to get user vestings for %s", userVestingKey), err)
@@ -149,7 +169,10 @@ func SetUserVesting(ctx kalpsdk.TransactionContextInterface, beneficiaryID strin
 		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("Failed to marshal updated user vesting list for %s", beneficiaryID), err)
 	}
 
-	userVestingKey := fmt.Sprintf("uservestings_%s", beneficiaryID)
+	userVestingKey, err := ctx.CreateCompositeKey(UserVestingsPrefix, []string{beneficiaryID})
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to create the composite key for SetUserVesting with beneficiaryID %s", beneficiaryID), err)
+	}
 
 	err = ctx.PutStateWithoutKYC(userVestingKey, updatedUserVestingJSON)
 	if err != nil {
@@ -160,11 +183,9 @@ func SetUserVesting(ctx kalpsdk.TransactionContextInterface, beneficiaryID strin
 }
 
 func GetTotalClaimsForAll(ctx kalpsdk.TransactionContextInterface) (*big.Int, error) {
-	totalClaimsKey := "total_claims_for_all"
-
-	totalClaimsAsBytes, err := ctx.GetState(totalClaimsKey)
+	totalClaimsAsBytes, err := ctx.GetState(TotalClaimsForAllKey)
 	if err != nil {
-		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get total claims with Key %s", totalClaimsKey), err)
+		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to get total claims with Key %s", TotalClaimsForAllKey), err)
 	}
 
 	totalClaims := big.NewInt(0)
@@ -179,14 +200,12 @@ func GetTotalClaimsForAll(ctx kalpsdk.TransactionContextInterface) (*big.Int, er
 }
 
 func SetTotalClaimsForAll(ctx kalpsdk.TransactionContextInterface, totalClaims *big.Int) error {
-	totalClaimsKey := "total_claims_for_all"
-
 	totalClaimsAsBytes, err := totalClaims.MarshalText()
 	if err != nil {
 		return NewCustomError(http.StatusInternalServerError, "failed to marshal total claims", err)
 	}
 
-	err = ctx.PutStateWithoutKYC(totalClaimsKey, totalClaimsAsBytes)
+	err = ctx.PutStateWithoutKYC(TotalClaimsForAllKey, totalClaimsAsBytes)
 	if err != nil {
 		return NewCustomError(http.StatusInternalServerError, "failed to set total claims", err)
 	}
@@ -195,7 +214,10 @@ func SetTotalClaimsForAll(ctx kalpsdk.TransactionContextInterface, totalClaims *
 }
 
 func GetTotalClaims(ctx kalpsdk.TransactionContextInterface, vestingID string) (*big.Int, error) {
-	totalClaimsKey := fmt.Sprintf("total_claims_%s", vestingID)
+	totalClaimsKey, err := ctx.CreateCompositeKey(TotalClaimsPrefix, []string{vestingID})
+	if err != nil {
+		return nil, NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to create the composite key for GetTotalClaims with vestingID %s", vestingID), err)
+	}
 
 	totalClaimsAsBytes, err := ctx.GetState(totalClaimsKey)
 	if err != nil {
@@ -214,7 +236,10 @@ func GetTotalClaims(ctx kalpsdk.TransactionContextInterface, vestingID string) (
 }
 
 func SetTotalClaims(ctx kalpsdk.TransactionContextInterface, vestingID string, totalClaims *big.Int) error {
-	totalClaimsKey := fmt.Sprintf("total_claims_%s", vestingID)
+	totalClaimsKey, err := ctx.CreateCompositeKey(TotalClaimsPrefix, []string{vestingID})
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to create the composite key for SetTotalClaims with vestingID %s", vestingID), err)
+	}
 
 	totalClaimsAsBytes, err := totalClaims.MarshalText()
 	if err != nil {

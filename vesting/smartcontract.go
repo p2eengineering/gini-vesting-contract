@@ -20,12 +20,23 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 		return ErrCannotBeZero
 	}
 
+	currentTime, err := ctx.GetTxTimestamp()
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, "Failed to get transaction timestamp", nil)
+	}
+
+	if startTimestamp < uint64(currentTime.Seconds) {
+		return ErrStartTimestampLessThanCurrentTimeStamp(startTimestamp, uint64(currentTime.Seconds))
+	}
+
 	if err := IsSignerKalpFoundation(ctx); err != nil {
 		return err
 	}
 
-	kalpFoundationBeneficiaryKey := kalpFoundationBeneficiaryKeyPrefix + kalpFoundation
-	kalpFoundationUserVestingKey := kalpFoundationUserVestingKeyPrefix + kalpFoundation
+	kalpFoundationBeneficiaryKey, err := ctx.CreateCompositeKey(BeneficiariesPrefix, []string{EcosystemReserve.String(), kalpFoundation})
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to create the composite key for kalpFoundationBeneficiary with vestingID %s and beneficiaryID with address %s", EcosystemReserve.String(), kalpFoundation), err)
+	}
 
 	beneficiaryJSON, err := ctx.GetState(kalpFoundationBeneficiaryKey)
 	if err != nil {
@@ -34,6 +45,11 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 
 	if beneficiaryJSON != nil {
 		return fmt.Errorf("Contract is already initialised as %v", ErrBeneficiaryAlreadyExists(kalpFoundation))
+	}
+
+	kalpFoundationUserVestingKey, err := ctx.CreateCompositeKey(UserVestingsPrefix, []string{kalpFoundation})
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to create the composite key for kalpFoundationUserVesting with beneficiaryID %s", kalpFoundation), err)
 	}
 
 	userVestingJSON, err := ctx.GetState(kalpFoundationUserVestingKey)
@@ -45,18 +61,18 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 		return fmt.Errorf("Contract is already initialised as %v", ErrUserVestingsAlreadyExists(kalpFoundation))
 	}
 
-	validateNSetVesting(ctx, Team.String(), 30*12*24*60*60, startTimestamp, 30*24*24*60*60, ConvertGiniToWei(300000000), 0)
-	validateNSetVesting(ctx, Foundation.String(), 0, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(220000000), 0)
-	validateNSetVesting(ctx, PrivateRound1.String(), 30*12*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(200000000), 0)
-	validateNSetVesting(ctx, PrivateRound2.String(), 30*6*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(60000000), 0)
-	validateNSetVesting(ctx, Advisors.String(), 30*9*24*60*60, startTimestamp, 30*12*24*60*60, ConvertGiniToWei(30000000), 0)
-	validateNSetVesting(ctx, KOLRound.String(), 30*3*24*60*60, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(30000000), 25)
-	validateNSetVesting(ctx, Marketing.String(), 30*1*24*60*60, startTimestamp, 30*18*24*60*60, ConvertGiniToWei(80000000), 10)
-	validateNSetVesting(ctx, StakingRewards.String(), 30*3*24*60*60, startTimestamp, 30*24*24*60*60, ConvertGiniToWei(180000000), 0)
-	validateNSetVesting(ctx, EcosystemReserve.String(), 0, startTimestamp, 30*150*24*60*60, ConvertGiniToWei(560000000), 2)
-	validateNSetVesting(ctx, Airdrop.String(), 30*6*24*60*60, startTimestamp, 30*9*24*60*60, ConvertGiniToWei(80000000), 10)
-	validateNSetVesting(ctx, LiquidityPool.String(), 0, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(200000000), 25)
-	validateNSetVesting(ctx, PublicAllocation.String(), 30*3*24*60*60, startTimestamp, 30*6*24*60*60, ConvertGiniToWei(60000000), 25)
+	validateNSetVesting(ctx, Team.String(), TeamCliffDuration, startTimestamp, TeamVestingDuration, ConvertGiniToWei(TeamTotalSupply), TeamTGE)
+	validateNSetVesting(ctx, Foundation.String(), FoundationCliffDuration, startTimestamp, FoundationVestingDuration, ConvertGiniToWei(FoundationTotalSupply), FoundationTGE)
+	validateNSetVesting(ctx, PrivateRound1.String(), PrivateRound1CliffDuration, startTimestamp, PrivateRound1VestingDuration, ConvertGiniToWei(PrivateRound1TotalSupply), PrivateRound1TGE)
+	validateNSetVesting(ctx, PrivateRound2.String(), PrivateRound2CliffDuration, startTimestamp, PrivateRound2VestingDuration, ConvertGiniToWei(PrivateRound2TotalSupply), PrivateRound2TGE)
+	validateNSetVesting(ctx, Advisors.String(), AdvisorsCliffDuration, startTimestamp, AdvisorsVestingDuration, ConvertGiniToWei(AdvisorsTotalSupply), AdvisorsTGE)
+	validateNSetVesting(ctx, KOLRound.String(), KOLRoundCliffDuration, startTimestamp, KOLRoundVestingDuration, ConvertGiniToWei(KOLRoundTotalSupply), KOLRoundTGE)
+	validateNSetVesting(ctx, Marketing.String(), MarketingCliffDuration, startTimestamp, MarketingVestingDuration, ConvertGiniToWei(MarketingTotalSupply), MarketingTGE)
+	validateNSetVesting(ctx, StakingRewards.String(), StakingRewardsCliffDuration, startTimestamp, StakingRewardsVestingDuration, ConvertGiniToWei(StakingRewardsTotalSupply), StakingRewardsTGE)
+	validateNSetVesting(ctx, EcosystemReserve.String(), EcosystemReserveCliffDuration, startTimestamp, EcosystemReserveVestingDuration, ConvertGiniToWei(EcosystemReserveTotalSupply), EcosystemReserveTGE)
+	validateNSetVesting(ctx, Airdrop.String(), AirdropCliffDuration, startTimestamp, AirdropVestingDuration, ConvertGiniToWei(AirdropTotalSupply), AirdropTGE)
+	validateNSetVesting(ctx, LiquidityPool.String(), LiquidityPoolCliffDuration, startTimestamp, LiquidityPoolVestingDuration, ConvertGiniToWei(LiquidityPoolTotalSupply), LiquidityPoolTGE)
+	validateNSetVesting(ctx, PublicAllocation.String(), PublicAllocationCliffDuration, startTimestamp, PublicAllocationVestingDuration, ConvertGiniToWei(PublicAllocationTotalSupply), PublicAllocationTGE)
 
 	err = SetBeneficiary(ctx, EcosystemReserve.String(), kalpFoundation, &Beneficiary{
 		TotalAllocations: kalpFoundationTotalAllocations,
@@ -75,6 +91,8 @@ func (s *SmartContract) Initialize(ctx kalpsdk.TransactionContextInterface, star
 	if err != nil {
 		return NewCustomError(http.StatusInternalServerError, "failed to set user vestings", err)
 	}
+
+	SetTotalSupplyForEcosystemReserve(ctx, EcosystemReserveCliffDuration, startTimestamp, EcosystemReserveVestingDuration, ConvertGiniToWei(EcosystemReserveTotalSupplyAfterInitialisation), EcosystemReserveTGE)
 
 	return nil
 }
@@ -129,6 +147,13 @@ func (s *SmartContract) AddBeneficiaries(ctx kalpsdk.TransactionContextInterface
 
 	vestingTotalSupply.Sub(vestingTotalSupply, totalAllocations)
 
+	vestingPeriod.TotalSupply = vestingTotalSupply.String()
+
+	err = SetVestingPeriod(ctx, vestingID, vestingPeriod)
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("unable to set vestingPeriod for vestingId : %s", vestingID), nil)
+	}
+
 	EmitBeneficiariesAdded(ctx, vestingID, totalAllocations.String())
 
 	return nil
@@ -142,7 +167,12 @@ func (s *SmartContract) SetGiniToken(ctx kalpsdk.TransactionContextInterface, to
 		return err
 	}
 
-	if !IsContractAddressValid(tokenAddress) {
+	isContract, err := IsContractAddressValid(tokenAddress)
+	if err != nil {
+		return err
+	}
+
+	if !isContract {
 		return ErrInvalidContractAddress(tokenAddress)
 	}
 
@@ -173,7 +203,12 @@ func (s *SmartContract) CalculateClaimAmount(ctx kalpsdk.TransactionContextInter
 		return "0", ErrInvalidVestingID(vestingID)
 	}
 
-	if !IsUserAddressValid(beneficiaryAddress) {
+	isUser, err := IsUserAddressValid(beneficiaryAddress)
+	if err != nil {
+		return "0", err
+	}
+
+	if !isUser {
 		return "0", ErrInvalidUserAddress(beneficiaryAddress)
 	}
 
@@ -201,7 +236,10 @@ func (s *SmartContract) CalculateClaimAmount(ctx kalpsdk.TransactionContextInter
 		return "0", nil
 	}
 
-	currentTime, _ := ctx.GetTxTimestamp()
+	currentTime, err := ctx.GetTxTimestamp()
+	if err != nil {
+		return "0", NewCustomError(http.StatusInternalServerError, "Failed to get transaction timestamp", nil)
+	}
 
 	if uint64(currentTime.Seconds) <= vestingPeriod.CliffStartTimestamp {
 		return "0", nil
@@ -266,15 +304,24 @@ func (s *SmartContract) GetVestingData(ctx kalpsdk.TransactionContextInterface, 
 
 func (s *SmartContract) ClaimAll(ctx kalpsdk.TransactionContextInterface, beneficiary string) error {
 	logger := kalpsdk.NewLogger()
-	logger.Infoln("GetVestingData Invoked.... with arguments ", beneficiary)
+	logger.Infoln("ClaimAll Invoked.... with arguments ", beneficiary)
 
-	if !IsUserAddressValid(beneficiary) {
+	isUser, err := IsUserAddressValid(beneficiary)
+	if err != nil {
+		return err
+	}
+
+	if !isUser {
 		return ErrInvalidUserAddress(beneficiary)
 	}
 
 	signer, err := GetUserId(ctx)
 	if err != nil {
 		return NewCustomError(http.StatusInternalServerError, "failed to get client id", err)
+	}
+
+	if signer != beneficiary {
+		return NewCustomError(http.StatusBadRequest, fmt.Sprintf("Signer '%s' does not match the beneficiary '%s'", signer, beneficiary), nil)
 	}
 
 	userVestingList, err := GetUserVesting(ctx, beneficiary)
@@ -353,7 +400,12 @@ func (s *SmartContract) GetClaimsAmountForAllVestings(ctx kalpsdk.TransactionCon
 	logger := kalpsdk.NewLogger()
 	logger.Infoln("GetClaimsAmountForAllVestings Invoked.... with arguments ", beneficiary)
 
-	if !IsUserAddressValid(beneficiary) {
+	isUser, err := IsUserAddressValid(beneficiary)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isUser {
 		return nil, ErrInvalidUserAddress(beneficiary)
 	}
 
@@ -394,7 +446,12 @@ func (s *SmartContract) GetVestingsDuration(ctx kalpsdk.TransactionContextInterf
 	logger := kalpsdk.NewLogger()
 	logger.Infoln("GetVestingsDuration Invoked.... with input arguments ", beneficiary)
 
-	if !IsUserAddressValid(beneficiary) {
+	isUser, err := IsUserAddressValid(beneficiary)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isUser {
 		return nil, ErrInvalidUserAddress(beneficiary)
 	}
 
@@ -426,7 +483,12 @@ func (s *SmartContract) GetAllocationsForAllVestings(ctx kalpsdk.TransactionCont
 	logger := kalpsdk.NewLogger()
 	logger.Infoln("GetAllocationsForAllVestings Invoked.... with input arguments ", beneficiary)
 
-	if !IsUserAddressValid(beneficiary) {
+	isUser, err := IsUserAddressValid(beneficiary)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isUser {
 		return nil, ErrInvalidUserAddress(beneficiary)
 	}
 
@@ -458,7 +520,12 @@ func (s *SmartContract) GetUserVestings(ctx kalpsdk.TransactionContextInterface,
 	logger := kalpsdk.NewLogger()
 	logger.Infoln("GetUserVestings Invoked.... with arguments ", beneficiary)
 
-	if !IsUserAddressValid(beneficiary) {
+	isUser, err := IsUserAddressValid(beneficiary)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isUser {
 		return nil, ErrInvalidUserAddress(beneficiary)
 	}
 
@@ -478,7 +545,12 @@ func (s *SmartContract) GetTotalClaims(ctx kalpsdk.TransactionContextInterface, 
 	logger := kalpsdk.NewLogger()
 	logger.Infoln("GetTotalClaims Invoked.... with arguments ", beneficiary)
 
-	if !IsUserAddressValid(beneficiary) {
+	isUser, err := IsUserAddressValid(beneficiary)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isUser {
 		return nil, ErrInvalidUserAddress(beneficiary)
 	}
 
@@ -550,7 +622,10 @@ func (s *SmartContract) Claim(ctx kalpsdk.TransactionContextInterface, vestingID
 	}
 
 	if amountToClaimInInt.Cmp(big.NewInt(0)) == 0 {
-		timeStamp, _ := ctx.GetTxTimestamp()
+		timeStamp, err := ctx.GetTxTimestamp()
+		if err != nil {
+			return NewCustomError(http.StatusInternalServerError, "Failed to get transaction timestamp", nil)
+		}
 
 		if vestingPeriod.StartTimestamp > uint64(timeStamp.Seconds) {
 			return ErrOnlyAfterVestingStart(vestingID)

@@ -3,6 +3,7 @@ package vesting
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/p2eengineering/kalp-sdk-public/kalpsdk"
 )
@@ -109,6 +110,15 @@ func EmitClaim(ctx kalpsdk.TransactionContextInterface, user, vestingID, amount 
 	err = ctx.SetEvent(ClaimKey, claimJSON)
 	if err != nil {
 		return fmt.Errorf("failed to set event: %v", err)
+	}
+
+	return nil
+}
+
+func EmitEventEcosystemReserveTotalSupplyChanged(ctx kalpsdk.TransactionContextInterface, kalpFoundationTotalAllocations string) error {
+	err := ctx.SetEvent(EcoSystemReserveTotalSupplyChangedKey, []byte(fmt.Sprintf("Reducing TotalSupply for VestingId %s , since foundation has been added as a beneficiary, with TotalAllocations %s", EcosystemReserve.String(), kalpFoundationTotalAllocations)))
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to emit event : %s", EcoSystemReserveTotalSupplyChangedKey), nil)
 	}
 
 	return nil

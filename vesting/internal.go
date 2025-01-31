@@ -58,8 +58,57 @@ func validateNSetVesting(
 	return nil
 }
 
+func SetTotalSupplyForEcosystemReserve(
+	ctx kalpsdk.TransactionContextInterface,
+	cliffDuration,
+	startTimestamp,
+	duration uint64,
+	totalSupply string,
+	tge uint64,
+) error {
+	if startTimestamp == 0 {
+		return ErrCannotBeZero
+	}
+
+	if duration == 0 {
+		return ErrDurationCannotBeZero(EcosystemReserve.String())
+	}
+
+	totalSupplyInInt, ok := new(big.Int).SetString(totalSupply, 10)
+	if !ok {
+		return ErrInvalidAmount("vestingID", EcosystemReserve.String(), totalSupply)
+	}
+
+	if totalSupplyInInt.Cmp(big.NewInt(0)) < 0 {
+		return ErrTotalSupplyCannotBeNegative(EcosystemReserve.String())
+	}
+
+	vestingPeriod := &VestingPeriod{
+		TotalSupply:         totalSupply,
+		CliffStartTimestamp: startTimestamp,
+		StartTimestamp:      startTimestamp + cliffDuration,
+		EndTimestamp:        startTimestamp + duration + cliffDuration,
+		Duration:            duration,
+		TGE:                 tge,
+	}
+
+	err := SetVestingPeriod(ctx, EcosystemReserve.String(), vestingPeriod)
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to set vestingPeriod for VestingId: %s", EcosystemReserve.String()), nil)
+	}
+
+	EmitEventEcosystemReserveTotalSupplyChanged(ctx, kalpFoundationTotalAllocations)
+
+	return nil
+}
+
 func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, beneficiary, amount string) error {
-	if !IsUserAddressValid(beneficiary) {
+	isUser, err := IsUserAddressValid(beneficiary)
+	if err != nil {
+		return err
+	}
+
+	if !isUser {
 		return ErrInvalidUserAddress(beneficiary)
 	}
 
@@ -72,7 +121,12 @@ func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 		return fmt.Errorf("%w: %s", ErrNonPositiveVestingAmount, beneficiary)
 	}
 
-	beneficiaryJSON, err := ctx.GetState(fmt.Sprintf("beneficiaries_%s_%s", vestingID, beneficiary))
+	beneficiaryKey, err := ctx.CreateCompositeKey(BeneficiariesPrefix, []string{vestingID, beneficiary})
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to create the composite key for getting beneficiary with vestingID %s and beneficiaryID with address %s", vestingID, beneficiary), err)
+	}
+
+	beneficiaryJSON, err := ctx.GetState(beneficiaryKey)
 	if err != nil {
 		return fmt.Errorf("failed to get Beneficiary struct for vestingID : %s and beneficiary: %s, %v", vestingID, beneficiary, err)
 	}
@@ -85,6 +139,9 @@ func addBeneficiary(ctx kalpsdk.TransactionContextInterface, vestingID, benefici
 		TotalAllocations: amount,
 		ClaimedAmount:    "0",
 	})
+	if err != nil {
+		return err
+	}
 
 	userVestingList, err := GetUserVesting(ctx, beneficiary)
 	if err != nil {
@@ -191,7 +248,10 @@ func TransferGiniTokens(ctx kalpsdk.TransactionContextInterface, signer, totalCl
 
 	output := ctx.InvokeChaincode(giniContract, [][]byte{[]byte(giniTransfer), []byte(signer), []byte(totalClaimAmount)}, channel)
 
-	b, _ := strconv.ParseBool(string(output.Payload))
+	b, err := strconv.ParseBool(string(output.Payload))
+	if err != nil {
+		return NewCustomError(http.StatusInternalServerError, fmt.Sprintf("failed to parse output payload to boolean: %v", err), nil)
+	}
 
 	if !b {
 		return NewCustomError(int(output.Status), fmt.Sprintf("unable to transfer token: %s", output.Message), nil)

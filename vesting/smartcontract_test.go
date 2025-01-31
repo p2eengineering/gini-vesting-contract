@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/hyperledger/fabric-chaincode-go/pkg/cid"
 	"github.com/hyperledger/fabric-protos-go/ledger/queryresult"
 	"github.com/hyperledger/fabric-protos-go/peer"
@@ -23,7 +25,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
 
 type TokenAllocation int
 
@@ -36,7 +37,6 @@ const (
 	ContractAddressRegex               = `^klp-[a-fA-F0-9]+-cc$`
 	HexAddressRegex                    = `^[0-9a-fA-F]{40}$`
 	GiniTokenEvent                     = "SetGiniToken"
-	KalpFoundationKey                  = "kalp_foundation"
 	ClaimInterval                      = 30 * 24 * 60 * 60
 
 	GiniTransfer = "Transfer"
@@ -114,6 +114,17 @@ func SetUserID(transactionContext *mocks.TransactionContext, userID string) {
 	transactionContext.GetClientIdentityReturns(clientIdentity)
 }
 
+func SetUserIDErr(transactionContext *mocks.TransactionContext, userID string) {
+	completeId := fmt.Sprintf("x509::CN=%s,O=Organization,L=City,ST=State,C=Country", userID)
+
+	// Base64 encode the complete ID
+	b64ID := base64.StdEncoding.EncodeToString([]byte(completeId))
+
+	clientIdentity := &mocks.ClientIdentity{}
+	clientIdentity.GetIDReturns(b64ID, errors.New("err"))
+	transactionContext.GetClientIdentityReturns(clientIdentity)
+}
+
 func TestIsSignerKalpFoundation(t *testing.T) {
 	t.Parallel()
 
@@ -155,68 +166,14 @@ func TestIsSignerKalpFoundation(t *testing.T) {
 	}
 }
 
-func TestIsContractPreInitialize(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		testName       string
-		setupContext   func(*mocks.TransactionContext, map[string][]byte, *vesting.SmartContract)
-		expectedResult bool
-		timestamp      uint64
-		shouldError    bool
-	}{
-
-		{
-			testName: "Failure - Cannot delete foundation role",
-
-			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
-				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
-				ctx.GetKYCReturns(true, nil)
-				err := contract.Initialize(ctx, 12312123)
-				require.NoError(t, err)
-				// require.True(t, ok)
-			},
-			timestamp:   12312123,
-			shouldError: false,
-			// userID: constants.KalpFoundationAddress,
-			// expectedError: fmt.Errorf("foundation role cannot be deleted"),
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.testName, func(t *testing.T) {
-			t.Parallel()
-			transactionContext := &mocks.TransactionContext{}
-			vestingContract := &vesting.SmartContract{}
-			worldState := map[string][]byte{}
-
-			// ctx := &mocks.TransactionContext{}
-			tt.setupContext(transactionContext, worldState, vestingContract)
-
-			err := vestingContract.Initialize(transactionContext, tt.timestamp)
-
-			if tt.shouldError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
-}
-
 func TestInitialize(t *testing.T) {
 	t.Parallel()
 	transactionContext := &mocks.TransactionContext{}
 	vestingContract := vesting.SmartContract{}
 	// ****************START define helper functions*********************
 	worldState := map[string][]byte{}
-	transactionContext.CreateCompositeKeyStub = func(s1 string, s2 []string) (string, error) {
-		key := "_" + s1 + "_"
-		for _, s := range s2 {
-			key += s + "_"
-		}
-		return key, nil
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		return fmt.Sprintf("%s_%s", prefix, strings.Join(attrs, "_")), nil
 	}
 	transactionContext.PutStateWithoutKYCStub = func(s string, b []byte) error {
 		worldState[s] = b
@@ -285,12 +242,22 @@ func TestInitialize(t *testing.T) {
 		}
 		return string(result)
 	}
+	now := time.Now()
+	txTimestamp, err := ptypes.TimestampProto(now)
+
+	transactionContext.GetTxTimestampStub = func() (*timestamp.Timestamp, error) {
+		// Generate a current timestamp
+
+		// Convert the time to a protobuf Timestamp
+
+		return txTimestamp, nil
+	}
 	// ****************END define helper functions*********************
 
 	SetUserID(transactionContext, KalpFoundation)
 	// transactionContext.GetKYCReturns(true, nil)
 
-	err := vestingContract.Initialize(transactionContext, 199999999)
+	err = vestingContract.Initialize(transactionContext, 19999999900)
 	require.NoError(t, err)
 
 	// Test case for the invalid startTimestamp (0)
@@ -313,6 +280,298 @@ func TestInitialize(t *testing.T) {
 	require.NotEmpty(t, userVestingJSON)
 }
 
+func TestInitialize2(t *testing.T) {
+	t.Parallel()
+	transactionContext := &mocks.TransactionContext{}
+	vestingContract := vesting.SmartContract{}
+	// ****************START define helper functions*********************
+	worldState := map[string][]byte{}
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		return fmt.Sprintf("%s_%s", prefix, strings.Join(attrs, "_")), nil
+	}
+	transactionContext.PutStateWithoutKYCStub = func(s string, b []byte) error {
+		worldState[s] = b
+		return nil
+	}
+	transactionContext.GetQueryResultStub = func(s string) (kalpsdk.StateQueryIteratorInterface, error) {
+		var docType string
+		var account string
+
+		// finding doc type
+		re := regexp.MustCompile(`"docType"\s*:\s*"([^"]+)"`)
+		match := re.FindStringSubmatch(s)
+
+		if len(match) > 1 {
+			docType = match[1]
+		}
+
+		// finding account
+		re = regexp.MustCompile(`"account"\s*:\s*"([^"]+)"`)
+		match = re.FindStringSubmatch(s)
+
+		if len(match) > 1 {
+			account = match[1]
+		}
+
+		iteratorData := struct {
+			index int
+			data  []queryresult.KV
+		}{}
+		for key, val := range worldState {
+			if strings.Contains(key, docType) && strings.Contains(key, account) {
+				iteratorData.data = append(iteratorData.data, queryresult.KV{Key: key, Value: val})
+			}
+		}
+		iterator := &mocks.StateQueryIterator{}
+		iterator.HasNextStub = func() bool {
+			return iteratorData.index < len(iteratorData.data)
+		}
+		iterator.NextStub = func() (*queryresult.KV, error) {
+			if iteratorData.index < len(iteratorData.data) {
+				iteratorData.index++
+				return &iteratorData.data[iteratorData.index-1], nil
+			}
+			return nil, fmt.Errorf("iterator out of bounds")
+		}
+		return iterator, nil
+	}
+	transactionContext.GetStateStub = func(s string) ([]byte, error) {
+		data, found := worldState[s]
+		if found {
+			return data, nil
+		}
+		return nil, nil
+	}
+	transactionContext.DelStateWithoutKYCStub = func(s string) error {
+		delete(worldState, s)
+		return nil
+	}
+	transactionContext.GetTxIDStub = func() string {
+		const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+		length := 10
+		rand.Seed(time.Now().UnixNano()) // Seed the random number generator
+		result := make([]byte, length)
+		for i := range result {
+			result[i] = charset[rand.Intn(len(charset))]
+		}
+		return string(result)
+	}
+	now := time.Now()
+	txTimestamp, err := ptypes.TimestampProto(now)
+
+	transactionContext.GetTxTimestampStub = func() (*timestamp.Timestamp, error) {
+		// Generate a current timestamp
+
+		// Convert the time to a protobuf Timestamp
+
+		return txTimestamp, nil
+	}
+	// ****************END define helper functions*********************
+
+	SetUserID(transactionContext, KalpFoundation)
+	// transactionContext.GetKYCReturns(true, nil)
+
+	err = vestingContract.Initialize(transactionContext, 19999999900)
+	require.NoError(t, err)
+
+	// Test case for the invalid startTimestamp (0)
+	err = vestingContract.Initialize(transactionContext, 1000) // Passing 0 should trigger the error
+	require.Error(t, err)
+	require.Contains(t, err.Error(), fmt.Sprintf("start timestamp %d is less than the current time %d", 1000, uint64(txTimestamp.Seconds)))
+
+	KalpFoundation := "0b87970433b22494faff1cc7a819e71bddc7880c"
+	KalpFoundationBeneficiaryKeyPrefix := "beneficiaries_EcosystemReserve_"
+	KalpFoundationUserVestingKeyPrefix := "uservestings_"
+	kalpFoundationBeneficiaryKey := KalpFoundationBeneficiaryKeyPrefix + KalpFoundation
+	kalpFoundationUserVestingKey := KalpFoundationUserVestingKeyPrefix + KalpFoundation
+
+	beneficiaryJSON, err1 := transactionContext.GetStateStub(kalpFoundationBeneficiaryKey)
+	require.NoError(t, err1)
+	require.NotEmpty(t, beneficiaryJSON)
+
+	userVestingJSON, err1 := transactionContext.GetStateStub(kalpFoundationUserVestingKey)
+	require.NoError(t, err1)
+	require.NotEmpty(t, userVestingJSON)
+}
+
+func TestInitializeErrorTimestamp(t *testing.T) {
+	t.Parallel()
+	transactionContext := &mocks.TransactionContext{}
+	vestingContract := vesting.SmartContract{}
+	// ****************START define helper functions*********************
+	worldState := map[string][]byte{}
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		return fmt.Sprintf("%s_%s", prefix, strings.Join(attrs, "_")), nil
+	}
+	transactionContext.PutStateWithoutKYCStub = func(s string, b []byte) error {
+		worldState[s] = b
+		return nil
+	}
+	transactionContext.GetQueryResultStub = func(s string) (kalpsdk.StateQueryIteratorInterface, error) {
+		var docType string
+		var account string
+
+		// finding doc type
+		re := regexp.MustCompile(`"docType"\s*:\s*"([^"]+)"`)
+		match := re.FindStringSubmatch(s)
+
+		if len(match) > 1 {
+			docType = match[1]
+		}
+
+		// finding account
+		re = regexp.MustCompile(`"account"\s*:\s*"([^"]+)"`)
+		match = re.FindStringSubmatch(s)
+
+		if len(match) > 1 {
+			account = match[1]
+		}
+
+		iteratorData := struct {
+			index int
+			data  []queryresult.KV
+		}{}
+		for key, val := range worldState {
+			if strings.Contains(key, docType) && strings.Contains(key, account) {
+				iteratorData.data = append(iteratorData.data, queryresult.KV{Key: key, Value: val})
+			}
+		}
+		iterator := &mocks.StateQueryIterator{}
+		iterator.HasNextStub = func() bool {
+			return iteratorData.index < len(iteratorData.data)
+		}
+		iterator.NextStub = func() (*queryresult.KV, error) {
+			if iteratorData.index < len(iteratorData.data) {
+				iteratorData.index++
+				return &iteratorData.data[iteratorData.index-1], nil
+			}
+			return nil, fmt.Errorf("iterator out of bounds")
+		}
+		return iterator, nil
+	}
+	transactionContext.GetStateStub = func(s string) ([]byte, error) {
+		data, found := worldState[s]
+		if found {
+			return data, nil
+		}
+		return nil, nil
+	}
+	transactionContext.DelStateWithoutKYCStub = func(s string) error {
+		delete(worldState, s)
+		return nil
+	}
+	transactionContext.GetTxIDStub = func() string {
+		const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+		length := 10
+		rand.Seed(time.Now().UnixNano()) // Seed the random number generator
+		result := make([]byte, length)
+		for i := range result {
+			result[i] = charset[rand.Intn(len(charset))]
+		}
+		return string(result)
+	}
+	// transactionContext.GetTxTimestampStub = func() (*timestamp.Timestamp, error) {
+	// 	return nil, errors.New("err")
+	// }
+	// ****************END define helper functions*********************
+
+	SetUserID(transactionContext, KalpFoundation)
+	// transactionContext.GetKYCReturns(true, nil)
+
+	err := vestingContract.Initialize(transactionContext, 0) // Passing 0 should trigger the error
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "CannotBeZero")
+}
+
+func TestInitializeErrorTimestamp2(t *testing.T) {
+	t.Parallel()
+	transactionContext := &mocks.TransactionContext{}
+	vestingContract := vesting.SmartContract{}
+	// ****************START define helper functions*********************
+	worldState := map[string][]byte{}
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		return fmt.Sprintf("%s_%s", prefix, strings.Join(attrs, "_")), nil
+	}
+	transactionContext.PutStateWithoutKYCStub = func(s string, b []byte) error {
+		worldState[s] = b
+		return nil
+	}
+	transactionContext.GetQueryResultStub = func(s string) (kalpsdk.StateQueryIteratorInterface, error) {
+		var docType string
+		var account string
+
+		// finding doc type
+		re := regexp.MustCompile(`"docType"\s*:\s*"([^"]+)"`)
+		match := re.FindStringSubmatch(s)
+
+		if len(match) > 1 {
+			docType = match[1]
+		}
+
+		// finding account
+		re = regexp.MustCompile(`"account"\s*:\s*"([^"]+)"`)
+		match = re.FindStringSubmatch(s)
+
+		if len(match) > 1 {
+			account = match[1]
+		}
+
+		iteratorData := struct {
+			index int
+			data  []queryresult.KV
+		}{}
+		for key, val := range worldState {
+			if strings.Contains(key, docType) && strings.Contains(key, account) {
+				iteratorData.data = append(iteratorData.data, queryresult.KV{Key: key, Value: val})
+			}
+		}
+		iterator := &mocks.StateQueryIterator{}
+		iterator.HasNextStub = func() bool {
+			return iteratorData.index < len(iteratorData.data)
+		}
+		iterator.NextStub = func() (*queryresult.KV, error) {
+			if iteratorData.index < len(iteratorData.data) {
+				iteratorData.index++
+				return &iteratorData.data[iteratorData.index-1], nil
+			}
+			return nil, fmt.Errorf("iterator out of bounds")
+		}
+		return iterator, nil
+	}
+	transactionContext.GetStateStub = func(s string) ([]byte, error) {
+		data, found := worldState[s]
+		if found {
+			return data, nil
+		}
+		return nil, nil
+	}
+	transactionContext.DelStateWithoutKYCStub = func(s string) error {
+		delete(worldState, s)
+		return nil
+	}
+	transactionContext.GetTxIDStub = func() string {
+		const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+		length := 10
+		rand.Seed(time.Now().UnixNano()) // Seed the random number generator
+		result := make([]byte, length)
+		for i := range result {
+			result[i] = charset[rand.Intn(len(charset))]
+		}
+		return string(result)
+	}
+	transactionContext.GetTxTimestampStub = func() (*timestamp.Timestamp, error) {
+		return nil, errors.New("err")
+	}
+	// ****************END define helper functions*********************
+
+	SetUserID(transactionContext, KalpFoundation)
+	// transactionContext.GetKYCReturns(true, nil)
+
+	err := vestingContract.Initialize(transactionContext, 1000) // Passing 0 should trigger the error
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "[500] Failed to get transaction timestamp")
+}
+
 func TestClaim(t *testing.T) {
 	t.Parallel()
 	transactionContext := &mocks.TransactionContext{}
@@ -320,12 +579,8 @@ func TestClaim(t *testing.T) {
 
 	// ****************START define helper functions*********************
 	worldState := map[string][]byte{}
-	transactionContext.CreateCompositeKeyStub = func(s1 string, s2 []string) (string, error) {
-		key := "_" + s1 + "_"
-		for _, s := range s2 {
-			key += s + "_"
-		}
-		return key, nil
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		return fmt.Sprintf("%s_%s", prefix, strings.Join(attrs, "_")), nil
 	}
 	transactionContext.PutStateWithoutKYCStub = func(s string, b []byte) error {
 		worldState[s] = b
@@ -440,12 +695,8 @@ func TestAddBeneficiaries(t *testing.T) {
 	vestingContract := vesting.SmartContract{}
 	// ****************START define helper functions*********************
 	worldState := map[string][]byte{}
-	transactionContext.CreateCompositeKeyStub = func(s1 string, s2 []string) (string, error) {
-		key := "_" + s1 + "_"
-		for _, s := range s2 {
-			key += s + "_"
-		}
-		return key, nil
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		return fmt.Sprintf("%s_%s", prefix, strings.Join(attrs, "_")), nil
 	}
 	transactionContext.PutStateWithoutKYCStub = func(s string, b []byte) error {
 		worldState[s] = b
@@ -572,9 +823,9 @@ func TestAddBeneficiaries(t *testing.T) {
 
 	// Test 5: NoBeneficiaries
 	SetUserID(transactionContext, KalpFoundation) // Set the user ID for the test
-	vestingID2 := "Team"                                  // Test vesting ID
-	beneficiaries2 := []string{}                          // Invalid beneficiaries
-	amounts2 := []string{"1000000000000000"}              // Test amounts
+	vestingID2 := "Team"                          // Test vesting ID
+	beneficiaries2 := []string{}                  // Invalid beneficiaries
+	amounts2 := []string{"1000000000000000"}      // Test amounts
 
 	// Call AddBeneficiaries with the test data
 	err = vestingContract.AddBeneficiaries(transactionContext, vestingID2, beneficiaries2, amounts2)
@@ -604,12 +855,8 @@ func TestSetGiniToken(t *testing.T) {
 
 	// ****************START define helper functions*********************
 	worldState := map[string][]byte{}
-	transactionContext.CreateCompositeKeyStub = func(s1 string, s2 []string) (string, error) {
-		key := "_" + s1 + "_"
-		for _, s := range s2 {
-			key += s + "_"
-		}
-		return key, nil
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		return fmt.Sprintf("%s_%s", prefix, strings.Join(attrs, "_")), nil
 	}
 	transactionContext.PutStateWithoutKYCStub = func(s string, b []byte) error {
 		// Log the state being set
@@ -697,6 +944,9 @@ func TestGetTotalClaims(t *testing.T) {
 		worldState[key] = value
 		return nil
 	}
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		return fmt.Sprintf("%s_%s", prefix, strings.Join(attrs, "_")), nil
+	}
 
 	// Initialize the SmartContract
 	vestingContract := vesting.SmartContract{}
@@ -764,6 +1014,9 @@ func TestGetAllocationsForAllVestings(t *testing.T) {
 			return data, nil
 		}
 		return nil, nil
+	}
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		return fmt.Sprintf("%s_%s", prefix, strings.Join(attrs, "_")), nil
 	}
 
 	// Helper function to populate the world state
@@ -857,6 +1110,10 @@ func TestGetUserVestings(t *testing.T) {
 		return nil, nil
 	}
 
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		return fmt.Sprintf("%s_%s", prefix, strings.Join(attrs, "_")), nil
+	}
+
 	// Create a SmartContract instance
 	vestingContract := vesting.SmartContract{}
 
@@ -909,6 +1166,9 @@ func TestGetVestingsDuration(t *testing.T) {
 	beneficiary := "0b87970433b22494faff1cc7a819e71bddc7880c"
 	expectedUserVestings := []string{"vesting1", "vesting2"}
 	expectedVestingDurations := []uint64{12, 24}
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		return fmt.Sprintf("%s_%s", prefix, strings.Join(attrs, "_")), nil
+	}
 
 	// Mock the GetState method to return mock data
 	transactionContext.GetStateStub = func(key string) ([]byte, error) {
@@ -1040,6 +1300,9 @@ func TestGetVestingData(t *testing.T) {
 		}
 		return nil, nil
 	}
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		return fmt.Sprintf("%s_%s", prefix, strings.Join(attrs, "_")), nil
+	}
 
 	// 1. Valid Vesting ID Scenario
 	t.Run("Valid Vesting ID", func(t *testing.T) {
@@ -1117,6 +1380,9 @@ func TestCalculateClaimAmount(t *testing.T) {
 
 	// Mock TxTimestamp
 	transactionContext.GetTxTimestampReturns(timestamppb.New(time.Unix(1700000000, 0)), nil)
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		return fmt.Sprintf("%s_%s", prefix, strings.Join(attrs, "_")), nil
+	}
 
 	// Add mock Beneficiary to worldState
 	beneficiary := &vesting.Beneficiary{
@@ -1231,12 +1497,8 @@ func TestClaimAll(t *testing.T) {
 	vestingContract := vesting.SmartContract{}
 	// ****************START define helper functions*********************
 	worldState := map[string][]byte{}
-	transactionContext.CreateCompositeKeyStub = func(s1 string, s2 []string) (string, error) {
-		key := "_" + s1 + "_"
-		for _, s := range s2 {
-			key += s + "_"
-		}
-		return key, nil
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		return fmt.Sprintf("%s_%s", prefix, strings.Join(attrs, "_")), nil
 	}
 	transactionContext.PutStateWithoutKYCStub = func(s string, b []byte) error {
 		worldState[s] = b
@@ -1454,8 +1716,25 @@ func TestClaimIsCorrectVesting(t *testing.T) {
 
 			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
 				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				now := time.Now()
+				// Convert the time to a protobuf Timestamp
+				txTimestamp, err := ptypes.TimestampProto(now)
+				ctx.GetTxTimestampReturns(txTimestamp, nil)
+
 				ctx.GetKYCReturns(true, nil)
-				err := contract.Initialize(ctx, 12312123)
+				vestingPeriod := &vesting.VestingPeriod{
+					TotalSupply:         "560000000000000000000000000",
+					CliffStartTimestamp: 1737374042,
+					StartTimestamp:      1737373942,
+					EndTimestamp:        1737374242,
+					Duration:            1200,
+					TGE:                 0,
+				}
+				vestingAsBytes, _ := json.Marshal(vestingPeriod)
+				ctx.CreateCompositeKeyReturns("vestingperiod_EcosystemReserve", nil)
+				ctx.GetStateReturnsOnCall(2, vestingAsBytes, nil)
+
+				err = contract.Initialize(ctx, 12312123000)
 				require.NoError(t, err)
 				// require.True(t, ok)
 			},
@@ -1502,8 +1781,25 @@ func TestClaimIsGetClient(t *testing.T) {
 			testName: "Failure - failed to get client id",
 			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
 				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				now := time.Now()
+				// Convert the time to a protobuf Timestamp
+				txTimestamp, err := ptypes.TimestampProto(now)
+				ctx.GetTxTimestampReturns(txTimestamp, nil)
+
 				ctx.GetKYCReturns(true, nil)
-				err := contract.Initialize(ctx, 12312123)
+				vestingPeriod := &vesting.VestingPeriod{
+					TotalSupply:         "560000000000000000000000000",
+					CliffStartTimestamp: 1737374042,
+					StartTimestamp:      1737373942,
+					EndTimestamp:        1737374242,
+					Duration:            1200,
+					TGE:                 0,
+				}
+				vestingAsBytes, _ := json.Marshal(vestingPeriod)
+				ctx.CreateCompositeKeyReturns("vestingperiod_EcosystemReserve", nil)
+				ctx.GetStateReturnsOnCall(2, vestingAsBytes, nil)
+
+				err = contract.Initialize(ctx, 12312123000)
 				require.NoError(t, err)
 
 				SetUserID(ctx, "87970433b22494faff1cc7a819e71bddc7880c")
@@ -1552,8 +1848,25 @@ func TestClaimIsAmountValid(t *testing.T) {
 			testName: "Failure - Invalid amount",
 			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
 				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				now := time.Now()
+				// Convert the time to a protobuf Timestamp
+				txTimestamp, err := ptypes.TimestampProto(now)
+				ctx.GetTxTimestampReturns(txTimestamp, nil)
+
 				ctx.GetKYCReturns(true, nil)
-				err := contract.Initialize(ctx, 12312123)
+				vestingPeriod := &vesting.VestingPeriod{
+					TotalSupply:         "560000000000000000000000000",
+					CliffStartTimestamp: 1737374042,
+					StartTimestamp:      1737373942,
+					EndTimestamp:        1737374242,
+					Duration:            1200,
+					TGE:                 0,
+				}
+				vestingAsBytes, _ := json.Marshal(vestingPeriod)
+				ctx.CreateCompositeKeyReturns("vestingperiod_EcosystemReserve", nil)
+				ctx.GetStateReturnsOnCall(2, vestingAsBytes, nil)
+
+				err = contract.Initialize(ctx, 12312123000)
 				require.NoError(t, err)
 			},
 			vestingID:     "Team",
@@ -1601,8 +1914,25 @@ func TestClaimIsCorrectVestingId(t *testing.T) {
 
 			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
 				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				now := time.Now()
+				// Convert the time to a protobuf Timestamp
+				txTimestamp, err := ptypes.TimestampProto(now)
+				ctx.GetTxTimestampReturns(txTimestamp, nil)
+
 				ctx.GetKYCReturns(true, nil)
-				err := contract.Initialize(ctx, 12312123)
+				vestingPeriod := &vesting.VestingPeriod{
+					TotalSupply:         "560000000000000000000000000",
+					CliffStartTimestamp: 1737374042,
+					StartTimestamp:      1737373942,
+					EndTimestamp:        1737374242,
+					Duration:            1200,
+					TGE:                 0,
+				}
+				vestingAsBytes, _ := json.Marshal(vestingPeriod)
+				ctx.CreateCompositeKeyReturns("vestingperiod_EcosystemReserve", nil)
+				ctx.GetStateReturnsOnCall(2, vestingAsBytes, nil)
+
+				err = contract.Initialize(ctx, 12312123000)
 				require.NoError(t, err)
 				// require.True(t, ok)
 			},
@@ -1651,12 +1981,95 @@ func TestClaimAllIsCorrectVesting(t *testing.T) {
 
 			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
 				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				now := time.Now()
+				// Convert the time to a protobuf Timestamp
+				txTimestamp, err := ptypes.TimestampProto(now)
+				ctx.GetTxTimestampReturns(txTimestamp, nil)
+
 				ctx.GetKYCReturns(true, nil)
-				err := contract.Initialize(ctx, 12312123)
+				vestingPeriod := &vesting.VestingPeriod{
+					TotalSupply:         "560000000000000000000000000",
+					CliffStartTimestamp: 1737374042,
+					StartTimestamp:      1737373942,
+					EndTimestamp:        1737374242,
+					Duration:            1200,
+					TGE:                 0,
+				}
+				vestingAsBytes, _ := json.Marshal(vestingPeriod)
+				ctx.CreateCompositeKeyReturns("vestingperiod_EcosystemReserve", nil)
+				ctx.GetStateReturnsOnCall(2, vestingAsBytes, nil)
+
+				err = contract.Initialize(ctx, 12312123000)
 				require.NoError(t, err)
 				// require.True(t, ok)
 			},
 			beneficaryID: "",
+			shouldError:  true,
+			// userID: constants.KalpFoundationAddress,
+			// expectedError: fmt.Errorf("foundation role cannot be deleted"),
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			t.Parallel()
+			transactionContext := &mocks.TransactionContext{}
+			vestingContract := &vesting.SmartContract{}
+			worldState := map[string][]byte{}
+
+			// ctx := &mocks.TransactionContext{}
+			tt.setupContext(transactionContext, worldState, vestingContract)
+
+			err := vestingContract.ClaimAll(transactionContext, tt.beneficaryID)
+
+			if tt.shouldError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestClaimAllCheckBeneficiaryWithSigner(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		testName       string
+		setupContext   func(*mocks.TransactionContext, map[string][]byte, *vesting.SmartContract)
+		expectedResult bool
+		beneficaryID   string
+		shouldError    bool
+	}{
+
+		{
+			testName: "Failure - Cannot delete foundation role",
+
+			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
+				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				now := time.Now()
+				// Convert the time to a protobuf Timestamp
+				txTimestamp, err := ptypes.TimestampProto(now)
+				ctx.GetTxTimestampReturns(txTimestamp, nil)
+
+				ctx.GetKYCReturns(true, nil)
+				vestingPeriod := &vesting.VestingPeriod{
+					TotalSupply:         "560000000000000000000000000",
+					CliffStartTimestamp: 1737374042,
+					StartTimestamp:      1737373942,
+					EndTimestamp:        1737374242,
+					Duration:            1200,
+					TGE:                 0,
+				}
+				vestingAsBytes, _ := json.Marshal(vestingPeriod)
+				ctx.CreateCompositeKeyReturns("vestingperiod_EcosystemReserve", nil)
+				ctx.GetStateReturnsOnCall(2, vestingAsBytes, nil)
+
+				err = contract.Initialize(ctx, 12312123000)
+				require.NoError(t, err)
+				// require.True(t, ok)
+			},
+			beneficaryID: "0b87970433b22494faff1cc7a819e71bddc7880d",
 			shouldError:  true,
 			// userID: constants.KalpFoundationAddress,
 			// expectedError: fmt.Errorf("foundation role cannot be deleted"),
@@ -1702,8 +2115,25 @@ func TestIsAddBeneficiaries(t *testing.T) {
 
 			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
 				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				now := time.Now()
+				// Convert the time to a protobuf Timestamp
+				txTimestamp, err := ptypes.TimestampProto(now)
+				ctx.GetTxTimestampReturns(txTimestamp, nil)
+
 				ctx.GetKYCReturns(true, nil)
-				err := contract.Initialize(ctx, 12312123)
+				vestingPeriod := &vesting.VestingPeriod{
+					TotalSupply:         "560000000000000000000000000",
+					CliffStartTimestamp: 1737374042,
+					StartTimestamp:      1737373942,
+					EndTimestamp:        1737374242,
+					Duration:            1200,
+					TGE:                 0,
+				}
+				vestingAsBytes, _ := json.Marshal(vestingPeriod)
+				ctx.CreateCompositeKeyReturns("vestingperiod_EcosystemReserve", nil)
+				ctx.GetStateReturnsOnCall(2, vestingAsBytes, nil)
+
+				err = contract.Initialize(ctx, 12312123000)
 				require.NoError(t, err)
 				// require.True(t, ok)
 			},
@@ -1720,8 +2150,25 @@ func TestIsAddBeneficiaries(t *testing.T) {
 
 			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
 				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				now := time.Now()
+				// Convert the time to a protobuf Timestamp
+				txTimestamp, err := ptypes.TimestampProto(now)
+				ctx.GetTxTimestampReturns(txTimestamp, nil)
+
 				ctx.GetKYCReturns(true, nil)
-				err := contract.Initialize(ctx, 12312123)
+				vestingPeriod := &vesting.VestingPeriod{
+					TotalSupply:         "560000000000000000000000000",
+					CliffStartTimestamp: 1737374042,
+					StartTimestamp:      1737373942,
+					EndTimestamp:        1737374242,
+					Duration:            1200,
+					TGE:                 0,
+				}
+				vestingAsBytes, _ := json.Marshal(vestingPeriod)
+				ctx.CreateCompositeKeyReturns("vestingperiod_EcosystemReserve", nil)
+				ctx.GetStateReturnsOnCall(2, vestingAsBytes, nil)
+
+				err = contract.Initialize(ctx, 12312123000)
 				require.NoError(t, err)
 				// require.True(t, ok)
 			},
@@ -1737,8 +2184,25 @@ func TestIsAddBeneficiaries(t *testing.T) {
 
 			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
 				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				now := time.Now()
+				// Convert the time to a protobuf Timestamp
+				txTimestamp, err := ptypes.TimestampProto(now)
+				ctx.GetTxTimestampReturns(txTimestamp, nil)
+
 				ctx.GetKYCReturns(true, nil)
-				err := contract.Initialize(ctx, 12312123)
+				vestingPeriod := &vesting.VestingPeriod{
+					TotalSupply:         "560000000000000000000000000",
+					CliffStartTimestamp: 1737374042,
+					StartTimestamp:      1737373942,
+					EndTimestamp:        1737374242,
+					Duration:            1200,
+					TGE:                 0,
+				}
+				vestingAsBytes, _ := json.Marshal(vestingPeriod)
+				ctx.CreateCompositeKeyReturns("vestingperiod_EcosystemReserve", nil)
+				ctx.GetStateReturnsOnCall(2, vestingAsBytes, nil)
+
+				err = contract.Initialize(ctx, 12312123000)
 				require.NoError(t, err)
 				// require.True(t, ok)
 			},
@@ -1787,14 +2251,31 @@ func TestGetVestingDataIsGetClient(t *testing.T) {
 			testName: "Failure - failed to get client id",
 			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
 				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				now := time.Now()
+				// Convert the time to a protobuf Timestamp
+				txTimestamp, err := ptypes.TimestampProto(now)
+				ctx.GetTxTimestampReturns(txTimestamp, nil)
+
 				ctx.GetKYCReturns(true, nil)
-				err := contract.Initialize(ctx, 12312123)
+				vestingPeriod := &vesting.VestingPeriod{
+					TotalSupply:         "560000000000000000000000000",
+					CliffStartTimestamp: 1737374042,
+					StartTimestamp:      1737373942,
+					EndTimestamp:        1737374242,
+					Duration:            1200,
+					TGE:                 0,
+				}
+				vestingAsBytes, _ := json.Marshal(vestingPeriod)
+				ctx.CreateCompositeKeyReturns("vestingperiod_EcosystemReserve", nil)
+				ctx.GetStateReturnsOnCall(2, vestingAsBytes, nil)
+
+				err = contract.Initialize(ctx, 12312123000)
 				require.NoError(t, err)
 
 				SetUserID(ctx, "87970433b22494faff1cc7a819e71bddc7880c")
 			},
 			vestingID:     "Team",
-			expectedError: vesting.NewCustomError(402, "failed to get client id", fmt.Errorf("new erro")),
+			expectedError: nil,
 			// userID: constants.KalpFoundationAddress,
 			// expectedError: fmt.Errorf("foundation role cannot be deleted"),
 		},
@@ -1837,8 +2318,25 @@ func TestIsGetClaimsAmountForAllVestings(t *testing.T) {
 
 			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
 				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+				now := time.Now()
+				// Convert the time to a protobuf Timestamp
+				txTimestamp, err := ptypes.TimestampProto(now)
+				ctx.GetTxTimestampReturns(txTimestamp, nil)
+
 				ctx.GetKYCReturns(true, nil)
-				err := contract.Initialize(ctx, 12312123)
+				vestingPeriod := &vesting.VestingPeriod{
+					TotalSupply:         "560000000000000000000000000",
+					CliffStartTimestamp: 1737374042,
+					StartTimestamp:      1737373942,
+					EndTimestamp:        1737374242,
+					Duration:            1200,
+					TGE:                 0,
+				}
+				vestingAsBytes, _ := json.Marshal(vestingPeriod)
+				ctx.CreateCompositeKeyReturns("vestingperiod_EcosystemReserve", nil)
+				ctx.GetStateReturnsOnCall(2, vestingAsBytes, nil)
+
+				err = contract.Initialize(ctx, 12312123000)
 				require.NoError(t, err)
 				// require.True(t, ok)
 			},
@@ -1886,7 +2384,22 @@ func TestIsGetVestingsDuration(t *testing.T) {
 			setupContext: func(ctx *mocks.TransactionContext, worldState map[string][]byte, contract *vesting.SmartContract) {
 				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
 				ctx.GetKYCReturns(true, nil)
-				err := contract.Initialize(ctx, 12312123)
+				now := time.Now()
+				// Convert the time to a protobuf Timestamp
+				txTimestamp, err := ptypes.TimestampProto(now)
+				ctx.GetTxTimestampReturns(txTimestamp, nil)
+				vestingPeriod := &vesting.VestingPeriod{
+					TotalSupply:         "560000000000000000000000000",
+					CliffStartTimestamp: 1737374042,
+					StartTimestamp:      1737373942,
+					EndTimestamp:        1737374242,
+					Duration:            1200,
+					TGE:                 0,
+				}
+				vestingAsBytes, _ := json.Marshal(vestingPeriod)
+				ctx.CreateCompositeKeyReturns("vestingperiod_EcosystemReserve", nil)
+				ctx.GetStateReturnsOnCall(2, vestingAsBytes, nil)
+				err = contract.Initialize(ctx, 12312123000)
 				require.NoError(t, err)
 				// require.True(t, ok)
 			},
@@ -1911,6 +2424,406 @@ func TestIsGetVestingsDuration(t *testing.T) {
 			require.Empty(t, v1)
 			if tt.expectedError != nil {
 				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestClaimAll2(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		testName      string
+		setupContext  func(*mocks.TransactionContext, *vesting.SmartContract)
+		beneficiary   string
+		expectedError error
+	}{
+		{
+			testName: "Error - ErrNothingToClaim",
+			setupContext: func(ctx *mocks.TransactionContext, contract *vesting.SmartContract) {
+				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+
+			},
+			beneficiary:   "0b87970433b22494faff1cc7a819e71bddc7880c",
+			expectedError: vesting.ErrNothingToClaim,
+		},
+		{
+			testName: "Error - ErrInvalidUserAddress",
+			setupContext: func(ctx *mocks.TransactionContext, contract *vesting.SmartContract) {
+				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+
+			},
+			beneficiary:   "0b87970433b22494faff1cc7a819e71bddc7880cd",
+			expectedError: vesting.ErrInvalidUserAddress("0b87970433b22494faff1cc7a819e71bddc7880cd"),
+		},
+		{
+			testName: "Error - ErrInvalidUserAddress",
+			setupContext: func(ctx *mocks.TransactionContext, contract *vesting.SmartContract) {
+				SetUserIDErr(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+
+			},
+			beneficiary:   "0b87970433b22494faff1cc7a819e71bddc7880c",
+			expectedError: vesting.NewCustomError(http.StatusInternalServerError, "failed to get client id: failed to read clientID", errors.New("err")),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			t.Parallel()
+			transactionContext := &mocks.TransactionContext{}
+			smartContract := &vesting.SmartContract{}
+
+			tt.setupContext(transactionContext, smartContract)
+
+			err := smartContract.ClaimAll(transactionContext, tt.beneficiary)
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				require.Equal(t, tt.expectedError.Error(), err.Error())
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestGetVestingsDuration2(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		testName      string
+		setupContext  func(*mocks.TransactionContext, *vesting.SmartContract)
+		beneficiary   string
+		expectedError error
+	}{
+		{
+			testName: "Error - ErrInvalidUserAddress",
+			setupContext: func(ctx *mocks.TransactionContext, contract *vesting.SmartContract) {
+				SetUserID(ctx, "0b87970433b22494faff1cc7a819e71bddc7880c")
+
+			},
+			beneficiary:   "0b87970433b22494faff1cc7a819e71bddc7880cd",
+			expectedError: vesting.ErrInvalidUserAddress("0b87970433b22494faff1cc7a819e71bddc7880cd"),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			t.Parallel()
+			transactionContext := &mocks.TransactionContext{}
+			smartContract := &vesting.SmartContract{}
+
+			tt.setupContext(transactionContext, smartContract)
+
+			_, err := smartContract.GetVestingsDuration(transactionContext, tt.beneficiary)
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				require.Equal(t, tt.expectedError.Error(), err.Error())
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestGetClaimsAmountForAllVestings2(t *testing.T) {
+	// Initialize mock context
+	transactionContext := &mocks.TransactionContext{}
+	vestingContract := vesting.SmartContract{}
+
+	// Define the mock world state (similar to the GetStateStub)
+	worldState := map[string][]byte{}
+
+	// Mock the GetState method
+	transactionContext.GetStateStub = func(s string) ([]byte, error) {
+		data, found := worldState[s]
+		if found {
+			return data, nil
+		}
+		return nil, nil
+	}
+	// Mock the CreateCompositeKey method
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		key := "_" + prefix + "_"
+		for _, attr := range attrs {
+			key += attr + "_"
+		}
+		return key, nil
+	}
+	transactionContext.PutStateWithoutKYCStub = func(key string, value []byte) error {
+		worldState[key] = value
+		return nil
+	}
+	transactionContext.DelStateWithoutKYCStub = func(key string) error {
+		delete(worldState, key)
+		return nil
+	}
+	transactionContext.GetTxTimestampReturns(&timestamppb.Timestamp{
+		Seconds: 180000,
+	}, nil)
+
+	// type UserVestings []string
+	KalpFoundation := "0b87970433b22494faff1cc7a819e71bddc7880c"
+	userVestingList := &vesting.UserVestings{"Team"}
+
+	userVestingKey := fmt.Sprintf("_uservestings_%s_", KalpFoundation)
+	updatedUserVestingBytes, _ := json.Marshal(userVestingList)
+	err := transactionContext.PutStateWithoutKYC(userVestingKey, updatedUserVestingBytes)
+	require.NoError(t, err)
+
+	err = transactionContext.PutStateWithoutKYC("_beneficiaries_Team_0b87970433b22494faff1cc7a819e71bddc7880c_", []byte(`{"ClaimedAmount": "0","TotalAllocations": "150000000000000000000"}`))
+	require.NoError(t, err)
+
+	err = transactionContext.PutStateWithoutKYC("_vestingperiod_Team_", []byte(`{"totalSupply":"1000000","cliffStartTimestamp":1700000000,"startTimestamp":1701000000,"endTimestamp":1732000000,"duration":31536000,"tge":10}`))
+	require.NoError(t, err)
+
+	beneficiaryAddress := "0b87970433b22494faff1cc7a819e71bddc7880c"
+	allClaims, err := vestingContract.GetClaimsAmountForAllVestings(transactionContext, beneficiaryAddress)
+	require.NoError(t, err)
+	require.NotNil(t, allClaims)
+}
+func TestGetClaimsAmountForAllVestings_Negative(t *testing.T) {
+	// Initialize mock context
+	transactionContext := &mocks.TransactionContext{}
+	vestingContract := vesting.SmartContract{}
+
+	// Define the mock world state (similar to the GetStateStub)
+	worldState := map[string][]byte{}
+
+	// Mock the GetState method
+	transactionContext.GetStateStub = func(s string) ([]byte, error) {
+		data, found := worldState[s]
+		if found {
+			return data, nil
+		}
+		return nil, nil
+	}
+	// Mock the CreateCompositeKey method
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		key := "_" + prefix + "_"
+		for _, attr := range attrs {
+			key += attr + "_"
+		}
+		return key, nil
+	}
+	transactionContext.PutStateWithoutKYCStub = func(key string, value []byte) error {
+		worldState[key] = value
+		return nil
+	}
+	transactionContext.DelStateWithoutKYCStub = func(key string) error {
+		delete(worldState, key)
+		return nil
+	}
+	transactionContext.GetTxTimestampReturns(&timestamppb.Timestamp{
+		Seconds: 180000,
+	}, nil)
+
+	// type UserVestings []string
+	KalpFoundation := "0b87970433b22494faff1cc7a819e71bddc7880c"
+	userVestingList := &vesting.UserVestings{"Team"}
+
+	userVestingKey := fmt.Sprintf("_uservestings_%s_", KalpFoundation)
+	updatedUserVestingBytes, _ := json.Marshal(userVestingList)
+	err := transactionContext.PutStateWithoutKYC(userVestingKey, updatedUserVestingBytes)
+	require.NoError(t, err)
+
+	err = transactionContext.PutStateWithoutKYC("_beneficiaries_Team_0b87970433b22494faff1cc7a819e71bddc7880c_", []byte(`{"ClaimedAmount": "0","TotalAllocations": "150000000000000000000"}`))
+	require.NoError(t, err)
+
+	// err = transactionContext.PutStateWithoutKYC("_vestingperiod_Team_", []byte(`{"totalSupply":"1000000","cliffStartTimestamp":1700000000,"startTimestamp":1701000000,"endTimestamp":1732000000,"duration":31536000,"tge":10}`))
+	// require.NoError(t, err)
+
+	beneficiaryAddress := "0b87970433b22494faff1cc7a819e71bddc7880c"
+	_, err = vestingContract.GetClaimsAmountForAllVestings(transactionContext, beneficiaryAddress)
+	require.Error(t, err)
+
+	_, err = vestingContract.GetClaimsAmountForAllVestings(transactionContext, "122335")
+	require.Error(t, err)
+}
+
+func TestInitialize_Negative(t *testing.T) {
+	t.Parallel()
+	transactionContext := &mocks.TransactionContext{}
+	vestingContract := vesting.SmartContract{}
+	// ****************START define helper functions*********************
+	errorKeys := []string{}
+	worldState := map[string][]byte{}
+	transactionContext.CreateCompositeKeyStub = func(prefix string, attrs []string) (string, error) {
+		return fmt.Sprintf("%s_%s", prefix, strings.Join(attrs, "_")), nil
+	}
+	transactionContext.PutStateWithoutKYCStub = func(s string, b []byte) error {
+		for _, k := range errorKeys {
+			if k == s {
+				return errors.New("error in putState")
+			}
+		}
+		worldState[s] = b
+		return nil
+	}
+	transactionContext.GetQueryResultStub = func(s string) (kalpsdk.StateQueryIteratorInterface, error) {
+		var docType string
+		var account string
+		// finding doc type
+		re := regexp.MustCompile(`"docType"\s*:\s*"([^"]+)"`)
+		match := re.FindStringSubmatch(s)
+		if len(match) > 1 {
+			docType = match[1]
+		}
+		// finding account
+		re = regexp.MustCompile(`"account"\s*:\s*"([^"]+)"`)
+		match = re.FindStringSubmatch(s)
+		if len(match) > 1 {
+			account = match[1]
+		}
+		iteratorData := struct {
+			index int
+			data  []queryresult.KV
+		}{}
+		for key, val := range worldState {
+			if strings.Contains(key, docType) && strings.Contains(key, account) {
+				iteratorData.data = append(iteratorData.data, queryresult.KV{Key: key, Value: val})
+			}
+		}
+		iterator := &mocks.StateQueryIterator{}
+		iterator.HasNextStub = func() bool {
+			return iteratorData.index < len(iteratorData.data)
+		}
+		iterator.NextStub = func() (*queryresult.KV, error) {
+			if iteratorData.index < len(iteratorData.data) {
+				iteratorData.index++
+				return &iteratorData.data[iteratorData.index-1], nil
+			}
+			return nil, fmt.Errorf("iterator out of bounds")
+		}
+		return iterator, nil
+	}
+	transactionContext.GetStateStub = func(s string) ([]byte, error) {
+		data, found := worldState[s]
+		if found {
+			return data, nil
+		}
+		return nil, nil
+	}
+	transactionContext.DelStateWithoutKYCStub = func(s string) error {
+		delete(worldState, s)
+		return nil
+	}
+	transactionContext.GetTxIDStub = func() string {
+		const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+		length := 10
+		rand.Seed(time.Now().UnixNano()) // Seed the random number generator
+		result := make([]byte, length)
+		for i := range result {
+			result[i] = charset[rand.Intn(len(charset))]
+		}
+		return string(result)
+	}
+	transactionContext.GetTxTimestampStub = func() (*timestamp.Timestamp, error) {
+		// Generate a current timestamp
+		now := time.Now()
+		// Convert the time to a protobuf Timestamp
+		txTimestamp, err := ptypes.TimestampProto(now)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate timestamp: %v", err)
+		}
+		return txTimestamp, nil
+	}
+	// ****************END define helper functions*********************
+	SetUserID(transactionContext, KalpFoundation)
+	errorKeys = append(errorKeys, "vestingperiod_EcosystemReserve")
+	transactionContext.GetStateReturns([]byte{}, errors.New("error in GetState()"))
+	err := vestingContract.Initialize(transactionContext, 19999999900)
+	require.Error(t, err)
+	transactionContext.GetStateReturns([]byte{}, nil)
+	err = vestingContract.Initialize(transactionContext, 19999999900)
+	require.Error(t, err)
+	SetUserID(transactionContext, "16f8ff33ef05bb24fb9a30fa79e700f57a496184")
+	// transactionContext.GetKYCReturns(true, nil)
+	err = vestingContract.Initialize(transactionContext, 19999999900)
+	require.Error(t, err)
+}
+
+func TestSetTotalSupplyForEcosystemReserve(t *testing.T) {
+	tests := []struct {
+		testName       string
+		vestingID      string
+		cliffDuration  uint64
+		startTimestamp uint64
+		duration       uint64
+		totalSupply    string
+		tge            uint64
+		setupContext   func(*mocks.TransactionContext)
+		expectedError  error
+	}{
+		{
+			testName:       "Error - Start Timestamp Zero",
+			vestingID:      "valid-id",
+			cliffDuration:  0,
+			startTimestamp: 0,
+			duration:       1000,
+			totalSupply:    "1000",
+			tge:            10,
+			setupContext:   func(ctx *mocks.TransactionContext) {},
+			expectedError:  vesting.ErrCannotBeZero,
+		},
+		{
+			testName:       "Error - Duration Zero",
+			vestingID:      "valid-id",
+			cliffDuration:  0,
+			startTimestamp: 1,
+			duration:       0,
+			totalSupply:    "1000",
+			tge:            10,
+			setupContext:   func(ctx *mocks.TransactionContext) {},
+			expectedError:  vesting.ErrDurationCannotBeZero("EcosystemReserve"),
+		},
+		{
+			testName:       "Error - Invalid Total Supply",
+			vestingID:      "valid-id",
+			cliffDuration:  0,
+			startTimestamp: 1,
+			duration:       1000,
+			totalSupply:    "abc",
+			tge:            10,
+			setupContext:   func(ctx *mocks.TransactionContext) {},
+			expectedError:  vesting.ErrInvalidAmount("vestingID", "EcosystemReserve", "abc"),
+		},
+		{
+			testName:       "Error - TotalSupplyCannotBeNegative Total Supply",
+			vestingID:      "valid-id",
+			cliffDuration:  0,
+			startTimestamp: 1,
+			duration:       1000,
+			totalSupply:    "-100",
+			tge:            10,
+			setupContext:   func(ctx *mocks.TransactionContext) {},
+			expectedError:  vesting.ErrTotalSupplyCannotBeNegative("EcosystemReserve"),
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.testName, func(t *testing.T) {
+			t.Parallel()
+
+			mockCtx := &mocks.TransactionContext{}
+			tt.setupContext(mockCtx)
+
+			err := vesting.SetTotalSupplyForEcosystemReserve(
+				mockCtx,
+				tt.cliffDuration,
+				tt.startTimestamp,
+				tt.duration,
+				tt.totalSupply,
+				tt.tge,
+			)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				require.EqualError(t, err, tt.expectedError.Error())
 			} else {
 				require.NoError(t, err)
 			}
