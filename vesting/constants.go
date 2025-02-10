@@ -3,7 +3,7 @@ package vesting
 type TokenAllocation int
 
 const (
-	kalpFoundation                                 = "0b87970433b22494faff1cc7a819e71bddc7880c"
+	kalpFoundation                                 = "951d359b6a5dbcd130ea424f4cfb875b81ae2b2f"
 	kalpFoundationTotalAllocations                 = "560000000000000000000000000"
 	kalpFoundationClaimedAmount                    = "11200000000000000000000000"
 	contractAddressRegex                           = `^klp-[a-fA-F0-9]+-cc$`
